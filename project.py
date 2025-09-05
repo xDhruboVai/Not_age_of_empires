@@ -30,9 +30,9 @@ HEIGHT = 700
 ground_y = 0.0
 
 # Boss Stats
-boss_base_hp = 400
-boss_hp_wave_scale = 80
-boss_speed = 1
+boss_base_hp = 520
+boss_hp_wave_scale = 90
+boss_speed = 0.9
 boss_radius = 0.9
 boss_reward = 120
 
@@ -40,10 +40,10 @@ boss_reward = 120
 enemy_radius = 0.35
 bullet_radius = 0.12
 explosive_bullet_radius = 0.24
-tower_default_radius = 6.0
-tower_firerate = 0.9
-tower_dmg = 20
-bullet_speed = 8.0
+tower_default_radius = 6.5
+tower_firerate = 0.85
+tower_dmg = 22
+bullet_speed = 10.0
 
 # Player Stats
 player_hp = 100
@@ -53,14 +53,14 @@ kill_reward = 15
 leak_dmg = 10
 
 # Ability Costs and Durations
-abilitycost_fast = 100
-abilitycost_explosive = 150
-abilitycost_meteor = 200
-abilitycost_mega_knight = 500
+abilitycost_fast = 120
+abilitycost_explosive = 160
+abilitycost_meteor = 450
+abilitycost_mega_knight = 650
 ability_fast_duration = 10.0
 ability_explosive_duration = 10.0
 ability_fast_multiplier = 2.0
-megaknight_duration = 20.0 
+megaknight_duration = 20.0
 
 # Meteor 
 meteor_fall_speed = 14.0
@@ -81,9 +81,9 @@ explosive_bullet_color = (1.0, 0.45, 0.05)
 fast_explosive_bullet_color = (1.0, 0.9, 0.2)
 
 # turret
-tower_lifetime = 120        
-boss_tower_aoe_radius = 6.0    
-boss_tower_dps = 0      
+tower_lifetime = 30
+boss_tower_aoe_radius = 6.0
+boss_tower_dps = 0    
 
 # Health bar settings
 HPBAR_WIDTH = 2.8
@@ -776,11 +776,9 @@ class Meteor:
 class WaveManager:
     def __init__(self):
         self.wave_num = 1
-        self.spawn_interval = 1.2
-
+        self.spawn_interval = 1.25
         self.time_to_next = 2.0
-        self.to_spawn = 8 + 3 * self.wave_num
-
+        self.to_spawn = 8 + 2 * self.wave_num
         self.between_waves = 4.0
         self.resting = False
         self.boss_spawned = False
@@ -789,41 +787,38 @@ class WaveManager:
     def update(self, dt, game):
         if self.resting:
             self.time_to_next -= dt
-
             if self.time_to_next <= 0:
                 self.resting = False
                 self.boss_spawned = False
                 self.middle_boss_spawned = False
                 self.to_spawn = 8 + self.wave_num * 2
-                self.spawn_interval = max(0.4, 1.2 - 0.05 * self.wave_num)
+                self.spawn_interval = max(0.7, 1.4 - 0.07 * self.wave_num)
                 self.time_to_next = self.spawn_interval
             return
-        
+
         if self.to_spawn > 0:
             self.time_to_next -= dt
 
             if self.time_to_next <= 0:
                 self.time_to_next = self.spawn_interval
                 self.to_spawn -= 1
-                spawn_enemy(game, speed = 3 + 0.05 * self.wave_num, health = 60 + 10 * self.wave_num)
 
+                spawn_enemy(game, speed = 1.2 + 0.08 * self.wave_num, health = 85 + 18 * self.wave_num)
                 if not self.middle_boss_spawned and self.to_spawn <= self.wave_num:
                     self.middle_boss_spawned = True
                     spawn_boss(game)
             return
-        
+
         if not self.boss_spawned:
             self.boss_spawned = True
-
-            for _ in range(math.ceil(self.wave_num / 3)):
+            if self.wave_num % 2 == 0:
                 spawn_boss(game)
             return
-        
+
         if not any(e.alive for e in game.enemies):
             self.resting = True
             self.wave_num += 1
             self.time_to_next = self.between_waves
-
 class Camera:
     def __init__(self):
         self.target_x = 0.0
@@ -899,6 +894,7 @@ class GameState:
             print("Not enough money for Mega Knight!")
 
 def apply_boss_aoe_to_towers(game, dt):
+    #Edi baad
     bosses = [e for e in game.enemies if e.alive and e.is_boss]
     if not bosses:
         return
@@ -910,13 +906,27 @@ def apply_boss_aoe_to_towers(game, dt):
             if dist2D(t.x, t.z, b.x, b.z) <= boss_tower_aoe_radius:
                 t.hp -= boss_tower_dps * dt
 
+def activate_repair_all(game):
+    active_slots = [s for s in game.tower_slots if s.occupied and s.tower and s.tower.active]
+    cost = max(0.0, len(active_slots) * float(tower_cost) - 100.0)
+    if game.player.money < cost:
+        return False
+
+    game.player.money -= cost
+    for s in active_slots:
+        t = s.tower
+        t.hp = t.max_hp
+        t.hp_vis = t.hp 
+
+    return True
+
 # Logic
 
 def spawn_enemy(game, speed, health):
     path_start = game.map.path_points[0]
     x0 = path_start[0]
     z0 = path_start[1]
-    game.enemies.append(Enemy(x0, z0, speed * 1.5, health, is_boss=False))
+    game.enemies.append(Enemy(x0, z0, speed, health, is_boss = False))
 
 def spawn_boss(game):
     path_start = game.map.path_points[0]
@@ -1481,6 +1491,7 @@ def draw_game_world():
         return (obj.x - ex)**2 + (obj.y - ey)**2 + (obj.z - ez)**2
 
     dynamic_objects = []
+
     for slot in G.tower_slots:
         if slot.occupied:
             dynamic_objects.append({'obj': slot.tower, 'type' : 'tower', 'dist' : dist_sq_to_cam(slot.tower)})
@@ -1495,11 +1506,9 @@ def draw_game_world():
 
     dynamic_objects.sort(key = lambda item: item['dist'], reverse = True)
 
-
     for item in dynamic_objects:
         obj_type = item['type']
         obj = item['obj']
-
         if obj_type == 'tower': draw_tower(obj, G.quadric)
         elif obj_type == 'enemy': draw_enemy(obj, G.quadric)
         elif obj_type == 'projectile': draw_projectile(obj, G.quadric)
@@ -1508,7 +1517,12 @@ def draw_game_world():
 
     glColor3f(0.0, 0.0, 0.0)
     draw_text_2d(10, HEIGHT - 24, f"Health: {G.player.health}   Money: {G.player.money}   Score: {G.player.score}   Wave: {G.wave.wave_num}   Map: {G.map.name}")
-    draw_text_2d(10, HEIGHT - 48, "[P] Pause | [1-0] Build | F: Fast | E: Explosive | M: Meteor | G: Mega Knight | Arrows: Camera")
+
+    active_slots_count = sum(1 for s in G.tower_slots if s.occupied and s.tower and s.tower.active)
+    repair_cost = max(0.0, active_slots_count * float(tower_cost) - 100.0)
+    draw_text_2d(10, HEIGHT - 48, f"[P] Pause | [1-0] Build | F: FireRate+ {abilitycost_fast} | E: Explosive {abilitycost_explosive}")
+    draw_text_2d(10, HEIGHT - 96, f"M: Meteor {abilitycost_meteor} | G: MegaKnight {abilitycost_mega_knight} | R: Repair {int(repair_cost)} | Arrows: Camera")
+
     mk = G.abilities.mega_knight
     if mk and mk.alive:
         info = ""
@@ -1519,7 +1533,7 @@ def draw_game_world():
         draw_text_2d(10, HEIGHT - 72, info)
     else:
         draw_text_2d(10, HEIGHT - 72, f"Mega Knight Cost: {abilitycost_mega_knight} | [G] to Summon")
-
+        
 def display():
     if G.game_state == 'MAIN_MENU':
         draw_main_menu()
@@ -1530,6 +1544,7 @@ def display():
             draw_pause_menu()
         elif G.game_state == 'GAME_OVER':
             draw_game_over_screen()
+
     glutSwapBuffers()
 
 def idle():
@@ -1558,7 +1573,7 @@ def keyboard(key, x, y):
         elif k == 'e': activate_explosive(G, now)
         elif k == 'm': activate_meteor(G)
         elif k == 'g': G.activate_mega_knight()
-        elif k == 'q': sys.exit(0)
+        elif k == 'r': activate_repair_all(G)
 
     elif G.game_state == 'PAUSED':
         if k == 'p':
