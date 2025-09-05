@@ -371,6 +371,8 @@ class MegaKnight:
                     e.alive = False
                     G.player.money += (boss_reward if e.is_boss else kill_reward)
                     G.player.score += (50 if e.is_boss else 10)
+        G.shake_timer = 1.0
+        G.shake_mag = 0.6
 
     def draw(self, quadric):
         if not self.alive:
@@ -520,6 +522,20 @@ class MegaKnight:
 
         glPopMatrix()
 
+def apply_screen_shake():
+    if G.shake_timer <= 0.0:
+        return
+    duration = 1.0
+    decay = G.shake_timer / duration
+    amp = G.shake_mag * decay
+
+    t = time.perf_counter()
+    ox = math.sin(t * G.shake_freq) * amp
+    oy = math.cos(t * G.shake_freq * 1.3) * amp * 0.5
+    oz = math.sin(t * G.shake_freq * 0.7 + 1.57) * amp
+
+    glTranslatef(ox, oy, oz)
+
 # Meteor
 class Meteor:
     def __init__(self, x, z):
@@ -536,6 +552,8 @@ class Meteor:
         self.y -= self.speed * dt
         if self.y <= ground_y + 0.1:
             self.alive = False
+            G.shake_timer = 1
+            G.shake_mag = 1
 
 # waves
 class WaveManager:
@@ -618,6 +636,9 @@ class GameState:
         self.quadric = None
         self.last_time = time.perf_counter()
         self.paused = False
+        self.shake_timer = 0.0      # seconds left
+        self.shake_mag = 0.0        # base magnitude
+        self.shake_freq = 35.0
 
     def activate_mega_knight(self):
         if not self.abilities.activate_mega_knight(self):
@@ -686,6 +707,10 @@ def update_game(game, dt):
     update_projectiles(game, dt)
     update_meteors(game, dt)
 
+    if game.shake_timer > 0.0:
+        game.shake_timer = max(0.0, game.shake_timer - dt)
+
+
 def update_enemies(game, dt):
     path = game.map.path_points
     base_x, base_z = path[-1]
@@ -724,23 +749,29 @@ def update_towers(game, dt):
         if not slot.occupied or not slot.tower.active:
             continue
         t = slot.tower
-        t.cooldown -= dt
+        t.cooldown -= dt  # Decrease cooldown based on time passed
         target = acquire_target(t, game.enemies)
+        
         if target:
             dx, dz = (target.x - t.x), (target.z - t.z)
-            t.yaw_deg = math.degrees(math.atan2(dx, dz))
+
+            t.yaw_deg = math.degrees(math.atan2(dz, dx))
+
             if t.cooldown <= 0.0:
-                t.cooldown = t.effective_interval(game.abilities)
+                t.cooldown = t.effective_interval(game.abilities) 
+
                 dir_x, dir_z = normalize2D(dx, dz)
-                dir_y = 0.1
+                dir_y = 0.1 
+
                 proj = Projectile(
-                    x = t.x, y = t.y + 1.0, z = t.z,
-                    dir_x = dir_x, dir_y = dir_y, dir_z = dir_z,
+                    x = t.x, y = t.y + 1.0, z = t.z,  # Position of the turret
+                    dir_x = dir_x, dir_y = dir_y, dir_z = dir_z,  # Direction of the projectile
                     speed = t.projectile_speed,
                     damage = t.damage,
                     explosive = game.abilities.explosive_active
                 )
                 game.projectiles.append(proj)
+
 
 def update_projectiles(game, dt):
     alive_proj = []
@@ -1007,6 +1038,8 @@ def display():
 
     ex, ey, ez = G.camera.eye()
     gluLookAt(ex, ey, ez, G.camera.target_x, G.camera.target_y, G.camera.target_z, 0, 1, 0)
+
+    apply_screen_shake()
 
     # world
     draw_sky_walls()
