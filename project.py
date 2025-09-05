@@ -1,5 +1,6 @@
 import math, time, random, sys
 
+
 from OpenGL.GL import (
     glBegin, glEnd, glClear, glColor3f, glLoadIdentity, glMatrixMode, glPointSize,
     glPopMatrix, glPushMatrix, glRasterPos2f, glRotatef, glScalef, glTranslatef,
@@ -22,6 +23,7 @@ from OpenGL.GLUT import (
     GLUT_KEY_LEFT, GLUT_KEY_RIGHT, GLUT_KEY_UP, GLUT_KEY_DOWN
 )
 
+
 # Window and World Dimensions
 WIDTH = 1000
 HEIGHT = 700
@@ -37,6 +39,7 @@ boss_reward = 120
 # Enemy Tower Bullet Stats
 enemy_radius = 0.35
 bullet_radius = 0.12
+explosive_bullet_radius = 0.24
 tower_default_radius = 6.0
 tower_firerate = 0.9
 tower_dmg = 20
@@ -72,6 +75,27 @@ sky_wall_extent = 120.0
 sky_wall_height = 60.0
 sky_color = (0.70, 0.88, 1.00)
 
+normal_bullet_color = (1.0, 1.0, 1.0)
+fast_bullet_color = (0.2, 1.0, 1.0)        
+explosive_bullet_color = (1.0, 0.45, 0.05) 
+fast_explosive_bullet_color = (1.0, 0.9, 0.2)
+
+# turret
+tower_lifetime = 120        
+boss_tower_aoe_radius = 6.0    
+boss_tower_dps = 0      
+
+# Health bar settings
+HPBAR_WIDTH = 2.8
+HPBAR_DEPTH = 0.20
+HPBAR_HEIGHT = 0.4
+
+HPBAR_Y = 2.05
+HPBAR_MARGIN = 0.08
+HPBAR_SMOOTH_RATE = 0.10
+HPBAR_LAG_SEC = 0.25  
+
+TOWER_DECAY_RATE = 1.0
 
 class MapPreset:
     def __init__(self, name, path_points, tower_slots, path_width, ground_scale, camera_distance):
@@ -129,7 +153,7 @@ Male_Fantasy = MapPreset(
     ],
     path_width = 1.25,
     ground_scale = (80.0, 1.0, 60.0),
-    camera_distance = 38.0
+    camera_distance = 25.0
 )
 
 Mountain_Peak = MapPreset(
@@ -272,19 +296,25 @@ def lead_direction(shooter_x, shooter_z, target_x, target_z, vtx, vtz, proj_spee
     return normalize2D(aim_x, aim_z)
 
 class Projectile:
-    def __init__(self, x, y, z, dir_x, dir_y, dir_z, speed, damage, explosive = False):
+    def __init__(self, x, y, z, dir_x, dir_y, dir_z, speed, damage, explosive = False, fast = False):
         self.x = x
         self.y = y
         self.z = z
+
         self.dx = dir_x
         self.dy = dir_y
         self.dz = dir_z
+
         self.speed = speed
         self.damage = damage
-        self.radius = bullet_radius
+
+        self.radius = explosive_bullet_radius if explosive else bullet_radius
+
         self.lifetime = 0.0
         self.max_lifetime = 5.0
         self.explosive = explosive
+        self.fast = fast
+
         self.explosion_radius = 3 if explosive else 0.0
         self.alive = True
 
@@ -300,6 +330,9 @@ class Tower:
         self.projectile_speed = bullet_speed
         self.rotate_degree = 0.0
         self.active = True
+        self.max_hp = tower_lifetime
+        self.hp = self.max_hp
+        self.hp_vis = self.hp
 
     def effective_interval(self, abilities):
         interval = self.base_fire_interval
@@ -865,6 +898,17 @@ class GameState:
         if not self.abilities.activate_mega_knight(self):
             print("Not enough money for Mega Knight!")
 
+def apply_boss_aoe_to_towers(game, dt):
+    bosses = [e for e in game.enemies if e.alive and e.is_boss]
+    if not bosses:
+        return
+    for slot in game.tower_slots:
+        if not slot.occupied:
+            continue
+        t = slot.tower
+        for b in bosses:
+            if dist2D(t.x, t.z, b.x, b.z) <= boss_tower_aoe_radius:
+                t.hp -= boss_tower_dps * dt
 
 # Logic
 
@@ -929,6 +973,7 @@ def update_game(game, dt):
     game.wave.update(dt, game)
 
     update_enemies(game, dt)
+    apply_boss_aoe_to_towers(game, dt)
     update_towers(game, dt)
     update_projectiles(game, dt)
     update_meteors(game, dt)
@@ -977,20 +1022,38 @@ def update_towers(game, dt):
             continue
 
         t = slot.tower
+
+        t.hp -= dt * TOWER_DECAY_RATE
+        t.hp = clamp(t.hp, 0.0, t.max_hp)
+        if t.hp <= 0.0:
+            slot.occupied = False
+            slot.tower = None
+            continue
+
+        k = 1.0 - math.exp(-dt / HPBAR_LAG_SEC)
+        t.hp_vis += (t.hp - t.hp_vis) * k
+
         t.cooldown -= dt
         target = acquire_target(t, game.enemies)
 
         if target and dist2D(t.x, t.z, target.x, target.z) <= t.range:
-            
             vtx, vtz = enemy_velocity(target, game.map.path_points)
-            dir_x, dir_z = lead_direction(t.x, t.z, target.x, target.z, vtx, vtz, t.projectile_speed)
+            dir_x, dir_z = lead_direction(
+                t.x, t.z, target.x, target.z, vtx, vtz, t.projectile_speed
+            )
 
             t.rotate_degree = math.degrees(math.atan2(dir_x, dir_z))
 
             if t.cooldown <= 0.0:
                 t.cooldown = t.effective_interval(game.abilities)
                 game.projectiles.append(
-                    Projectile(t.x, t.y + 1.0, t.z, dir_x, 0.0, dir_z, t.projectile_speed, t.damage, game.abilities.explosive_active)
+                    Projectile(
+                        t.x, t.y + 1.0, t.z,
+                        dir_x, 0.0, dir_z,
+                        t.projectile_speed, t.damage,
+                        explosive=game.abilities.explosive_active,
+                        fast=game.abilities.fast_attack_active
+                    )
                 )
 
 def update_projectiles(game, dt):
@@ -1194,24 +1257,55 @@ def draw_tower(t, quadric):
     glRotatef(t.rotate_degree, 0, 1, 0)
     glColor3f(0.80, 0.80, 0.90)
 
+    # Base column
     glPushMatrix()
-
     glTranslatef(0.0, 0.5, 0.0)
     glRotatef(-90, 1, 0, 0)
     gluCylinder(quadric, 0.25, 0.25, 1.0, 12, 1)
-
     glPopMatrix()
 
+    # Barrel
     glColor3f(0.95, 0.40, 0.30)
     glPushMatrix()
-
     glTranslatef(0.0, 1.1, 0.0)
     glRotatef(-90, 1, 0, 0)
     gluCylinder(quadric, 0.1, 0.1, 0.6, 10, 1)
+    glPopMatrix()
+
+    ratio = clamp(t.hp_vis / t.max_hp, 0.0, 1.0)
+    bar_w = HPBAR_WIDTH
+    bar_d = HPBAR_DEPTH
+    bar_h = HPBAR_HEIGHT
+    y = HPBAR_Y
+
+    glPushMatrix()
+
+    glRotatef(-t.rotate_degree, 0, 1, 0)
+    glTranslatef(0.0, y, 0.0)
+
+
+    glPushMatrix()
+    glColor3f(0.55, 0.08, 0.08)
+    glTranslatef(0.0, bar_h * 0.5, 0.0)  
+    glScalef(bar_w, bar_h, bar_d)
+    glutSolidCube(1.0)
+    glPopMatrix()
+
+    inner_h = max(0.02, bar_h - 2 * HPBAR_MARGIN)
+    inner_d = max(0.02, bar_d - 2 * HPBAR_MARGIN)
+    inner_w = max(0.02, (bar_w - 2 * HPBAR_MARGIN) * ratio)
+
+    glPushMatrix()
+    glColor3f(0.12, 0.85, 0.18)
+    left_x = -bar_w * 0.5 + HPBAR_MARGIN  
+    glTranslatef(left_x + inner_w * 0.5, HPBAR_MARGIN + inner_h * 0.5, 0.0)
+    glScalef(inner_w, inner_h, inner_d)
+    glutSolidCube(1.0)
+    glPopMatrix()
 
     glPopMatrix()
     glPopMatrix()
-
+    
 def draw_enemy(e, quadric):
     glPushMatrix()
 
@@ -1229,7 +1323,17 @@ def draw_projectile(p, quadric):
     glPushMatrix()
 
     glTranslatef(p.x, p.y, p.z)
-    glColor3f(1.0, 0.6, 0.0 if p.explosive else 1.0)
+
+    if p.explosive and p.fast:
+        r, g, b = fast_explosive_bullet_color
+    elif p.explosive:
+        r, g, b = explosive_bullet_color
+    elif p.fast:
+        r, g, b = fast_bullet_color
+    else:
+        r, g, b = normal_bullet_color
+    glColor3f(r, g, b)
+
     gluSphere(quadric, p.radius, 10, 10)
 
     glPopMatrix()
