@@ -1,11 +1,12 @@
-import math, time, random
+import math, time, random, sys
 
 from OpenGL.GL import (
-    glBegin, glEnd, glClear, glColor3f, glLoadIdentity, glMatrixMode, glPointSize,
+    glBegin, glEnd, glClear, glColor3f, glColor4f, glLoadIdentity, glMatrixMode, glPointSize,
     glPopMatrix, glPushMatrix, glRasterPos2f, glRotatef, glScalef, glTranslatef,
-    glVertex3f, glViewport,
+    glVertex3f, glViewport, glVertex2f, glBlendFunc, glClearColor,
     GL_COLOR_BUFFER_BIT, GL_DEPTH_BUFFER_BIT, GL_LINES, GL_QUADS, GL_MODELVIEW,
-    GL_PROJECTION, GL_DEPTH_TEST, glEnable
+    GL_PROJECTION, GL_DEPTH_TEST, glEnable, GL_BLEND, GL_SRC_ALPHA,
+    GL_ONE_MINUS_SRC_ALPHA, glDisable
 )
 from OpenGL.GLU import (
     gluCylinder, gluLookAt, gluNewQuadric, gluOrtho2D, gluPerspective, gluSphere
@@ -42,6 +43,7 @@ bullet_speed = 8.0
 
 # player
 player_hp = 100
+player_start_money = float("inf")
 tower_cost = 75
 kill_reward = 15
 leak_dmg = 10
@@ -50,11 +52,11 @@ leak_dmg = 10
 abilitycost_fast = 100
 abilitycost_explosive = 150
 abilitycost_meteor = 200
-abilitycost_mega_knight = 500   
+abilitycost_mega_knight = 500
 ability_fast_duration = 10.0
 ability_explosive_duration = 10.0
 ability_fast_multiplier = 2.0
-mega_knight_duration = 20.0 
+mega_knight_duration = 20.0
 
 # meteor
 meteor_fall_speed = 14.0
@@ -82,10 +84,10 @@ class MapPreset:
 
 DEFAULT_MAP = MapPreset(
     name = "Default",
-    path_points = [(-4.0, -4.0), (-4.0, -2.0), (0.0, -2.0), (2.0, -2.0), (2.0, 2.0), (4.0, 2.0)],  
-    tower_slots = [(-5.5, -2.0), (-2.0, -1.5), (0.5, -1.0), (2.0, -1.0), (1.5, 2.0), (3.5, 2.0)],  
+    path_points = [(-4.0, -4.0), (-4.0, -2.0), (0.0, -2.0), (2.0, -2.0), (2.0, 2.0), (4.0, 2.0)],
+    tower_slots = [(-5.5, -2.0), (-2.0, -1.5), (0.5, -1.0), (2.0, -1.0), (1.5, 2.0), (3.5, 2.0)],
     path_width = 1.2,
-    ground_scale = (20.0, 1.0, 15.0), 
+    ground_scale = (20.0, 1.0, 15.0),
     camera_distance = 16.0
 )
 
@@ -103,7 +105,6 @@ Mohammadpur = MapPreset(
 )
 
 MAPS = {"Default": DEFAULT_MAP, "Mohammadpur": Mohammadpur}
-SELECTED_MAP = "Default"
 
 # math helpers
 def dist2D(ax, az, bx, bz):
@@ -163,7 +164,7 @@ class Tower:
         self.cooldown = 0.0
         self.damage = tower_dmg
         self.projectile_speed = bullet_speed
-        self.yaw_deg = 0.0
+        self.rotate_degree = 0.0
         self.active = True
 
     def effective_interval(self, abilities):
@@ -184,7 +185,7 @@ class TowerSlot:
 class Player:
     def __init__(self):
         self.health = player_hp
-        self.money = float("inf")
+        self.money = 0
         self.score = 0
 
 # abilities
@@ -246,14 +247,14 @@ class MegaKnight:
         self.lock_z = None
 
         # damage
-        self.landing_damage = 220.0  
-        self.aoe_radius = 5.0   
+        self.landing_damage = 220.0
+        self.aoe_radius = 5.0
 
         self.active = False
-        self.timer = 0.0  
+        self.timer = 0.0
 
         # facing
-        self.yaw_deg = 0.0
+        self.rotate_degree = 0.0
         self.allow_manual = False
 
     def update(self, dt):
@@ -269,7 +270,7 @@ class MegaKnight:
             if self.lock_x is not None:
                 dx, dz = (self.lock_x - self.x), (self.lock_z - self.z)
                 if abs(dx) + abs(dz) > 1e-5:
-                    self.yaw_deg = math.degrees(math.atan2(dx, dz))
+                    self.rotate_degree = math.degrees(math.atan2(dx, dz))
 
             t_left = self.jump_time - dt
             if t_left < 0.0:
@@ -304,7 +305,7 @@ class MegaKnight:
             if self.lock_x is not None:
                 dx, dz = (self.lock_x - self.x), (self.lock_z - self.z)
                 if abs(dx) + abs(dz) > 1e-5:
-                    self.yaw_deg = math.degrees(math.atan2(dx, dz))
+                    self.rotate_degree = math.degrees(math.atan2(dx, dz))
             self.charge_timer -= dt
             if self.charge_timer <= 0.0 and self.lock_x is not None:
                 self.start_x = self.x
@@ -330,7 +331,7 @@ class MegaKnight:
             self.z += ndz * self.walk_speed * dt
 
             if abs(dx) + abs(dz) > 1e-5:
-                self.yaw_deg = math.degrees(math.atan2(dx, dz))
+                self.rotate_degree = math.degrees(math.atan2(dx, dz))
 
             cand = None
             cand_goal = 1e9
@@ -380,9 +381,9 @@ class MegaKnight:
         glPushMatrix()
 
         s = self.radius
-        base_lift = 1.09 * s - 0.5 
+        base_lift = 1.09 * s - 0.5
         glTranslatef(self.x, self.y + base_lift, self.z)
-        glRotatef(self.yaw_deg, 0, 1, 0) 
+        glRotatef(self.rotate_degree, 0, 1, 0)
 
         s = self.radius
 
@@ -565,7 +566,7 @@ class WaveManager:
         self.between_waves = 4.0
         self.resting = False
         self.boss_spawned = False
-        self.middle_boss_spawned = False 
+        self.middle_boss_spawned = False
 
     def update(self, dt, game):
         if self.resting:
@@ -573,7 +574,7 @@ class WaveManager:
             if self.time_to_next <= 0:
                 self.resting = False
                 self.boss_spawned = False
-                self.middle_boss_spawned = False 
+                self.middle_boss_spawned = False
                 self.to_spawn = 8 + self.wave_num * 2
                 self.spawn_interval = max(0.4, 1.2 - 0.05 * self.wave_num)
                 self.time_to_next = self.spawn_interval
@@ -586,15 +587,15 @@ class WaveManager:
                 self.to_spawn -= 1
                 spawn_enemy(game, speed = 1.2 + 0.05 * self.wave_num, health = 60 + 10 * self.wave_num)
 
-                if not self.middle_boss_spawned and self.to_spawn <= self.wave_num:  
+                if not self.middle_boss_spawned and self.to_spawn <= self.wave_num:
                     self.middle_boss_spawned = True
-                    spawn_boss(game) 
+                    spawn_boss(game)
 
             return
 
         if not self.boss_spawned:
             self.boss_spawned = True
-            num_bosses = math.ceil(self.wave_num / 3) 
+            num_bosses = math.ceil(self.wave_num / 3)
             for _ in range(num_bosses):
                 spawn_boss(game)
             return
@@ -610,35 +611,65 @@ class Camera:
     def __init__(self):
         self.target_x, self.target_y, self.target_z = (0.0, 0.0, 0.0)
         self.distance = 16.0
-        self.yaw = 35.0
+        self.rotate = 35.0
         self.pitch = 35.0
 
     def eye(self):
-        yaw_r = math.radians(self.yaw)
+        rotate_r = math.radians(self.rotate)
         pitch_r = math.radians(self.pitch)
-        cx = self.target_x + self.distance * math.cos(pitch_r) * math.sin(yaw_r)
+        cx = self.target_x + self.distance * math.cos(pitch_r) * math.sin(rotate_r)
         cy = self.target_y + self.distance * math.sin(pitch_r)
-        cz = self.target_z + self.distance * math.cos(pitch_r) * math.cos(yaw_r)
+        cz = self.target_z + self.distance * math.cos(pitch_r) * math.cos(rotate_r)
         return (cx, cy, cz)
 
 # game state
 class GameState:
     def __init__(self):
-        self.map = MAPS["Mohammadpur"]
+        self.game_state = 'MAIN_MENU'
+        self.map_names = list(MAPS.keys())
+        self.selected_map_idx = 0
+
+        self.map = None
+        self.player = None
+        self.abilities = None
+        self.wave = None
+        self.enemies = []
+        self.projectiles = []
+        self.tower_slots = []
+        self.camera = Camera()
+        self.quadric = None
+        self.last_time = 0.0
+        self.shake_timer = 0.0
+        self.shake_mag = 0.0
+        self.shake_freq = 35.0
+
+    def reset(self, start_game=True):
+        selected_map_name = self.get_selected_map_name()
+        self.map = MAPS[selected_map_name]
+
         self.player = Player()
+        self.player.money = player_start_money
         self.abilities = Abilities()
         self.wave = WaveManager()
         self.enemies = []
         self.projectiles = []
         self.tower_slots = [TowerSlot(x, z) for (x, z) in self.map.tower_slots]
-        self.camera = Camera()
+
         self.camera.distance = self.map.camera_distance
-        self.quadric = None
+        self.camera.target_x, self.camera.target_y, self.camera.target_z = (0.0, 0.0, 0.0)
+
         self.last_time = time.perf_counter()
-        self.paused = False
-        self.shake_timer = 0.0      # seconds left
-        self.shake_mag = 0.0        # base magnitude
-        self.shake_freq = 35.0
+        self.shake_timer = 0.0
+        self.shake_mag = 0.0
+
+        if start_game:
+            self.game_state = 'PLAYING'
+
+    def select_next_map(self):
+        self.selected_map_idx = (self.selected_map_idx + 1) % len(self.map_names)
+
+    def get_selected_map_name(self):
+        return self.map_names[self.selected_map_idx]
 
     def activate_mega_knight(self):
         if not self.abilities.activate_mega_knight(self):
@@ -728,6 +759,9 @@ def update_enemies(game, dt):
         if e.path_idx >= len(path) - 1 and dist2D(e.x, e.z, base_x, base_z) < 0.3:
             game.player.health -= leak_dmg
             e.alive = False
+            if game.player.health <= 0:
+                game.player.health = 0
+                game.game_state = 'GAME_OVER'
         if not e.is_dead():
             survivors.append(e)
     game.enemies = survivors
@@ -749,23 +783,23 @@ def update_towers(game, dt):
         if not slot.occupied or not slot.tower.active:
             continue
         t = slot.tower
-        t.cooldown -= dt  # Decrease cooldown based on time passed
+        t.cooldown -= dt  
         target = acquire_target(t, game.enemies)
-        
+
         if target:
             dx, dz = (target.x - t.x), (target.z - t.z)
 
-            t.yaw_deg = math.degrees(math.atan2(dz, dx))
+            t.rotate_degree = math.degrees(math.atan2(dz, dx))
 
             if t.cooldown <= 0.0:
-                t.cooldown = t.effective_interval(game.abilities) 
+                t.cooldown = t.effective_interval(game.abilities)
 
                 dir_x, dir_z = normalize2D(dx, dz)
-                dir_y = 0.1 
+                dir_y = 0.1
 
                 proj = Projectile(
-                    x = t.x, y = t.y + 1.0, z = t.z,  # Position of the turret
-                    dir_x = dir_x, dir_y = dir_y, dir_z = dir_z,  # Direction of the projectile
+                    x = t.x, y = t.y + 1.0, z = t.z, 
+                    dir_x = dir_x, dir_y = dir_y, dir_z = dir_z,  
                     speed = t.projectile_speed,
                     damage = t.damage,
                     explosive = game.abilities.explosive_active
@@ -959,7 +993,7 @@ def draw_tower_slot(slot):
 def draw_tower(t, quadric):
     glPushMatrix()
     glTranslatef(t.x, t.y, t.z)
-    glRotatef(t.yaw_deg, 0, 1, 0)
+    glRotatef(t.rotate_degree, 0, 1, 0)
     glColor3f(0.80, 0.80, 0.90)
     glPushMatrix()
     glTranslatef(0.0, 0.5, 0.0)
@@ -997,39 +1031,74 @@ def draw_projectile(p, quadric):
 def draw_meteor(m, quadric):
     glPushMatrix()
     glTranslatef(m.x, m.y, m.z)
-    glColor3f(0.9, 0.3, 0.3)  # Red color for meteor
+    glColor3f(0.9, 0.3, 0.3)  
     gluSphere(quadric, m.radius, 14, 10)
     glPopMatrix()
 
-# range debug
-def draw_ranges_debug(game):
-    glColor3f(0.1, 0.7, 0.1)
-    segments = 32
-    for slot in game.tower_slots:
-        if not slot.occupied:
-            continue
-        t = slot.tower
-        r = t.range
-        for i in range(segments):
-            ang0 = 2 * math.pi * (i / segments)
-            ang1 = 2 * math.pi * ((i + 1) / segments)
-            x0 = t.x + r * math.cos(ang0)
-            z0 = t.z + r * math.sin(ang0)
-            x1 = t.x + r * math.cos(ang1)
-            z1 = t.z + r * math.sin(ang1)
-            glBegin(GL_LINES)
-            glVertex3f(x0, ground_y + 0.02, z0)
-            glVertex3f(x1, ground_y + 0.02, z1)
-            glEnd()
+# NEW: Menu and UI Drawing Functions
+def draw_overlay():
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
+    gluOrtho2D(0, WIDTH, 0, HEIGHT)
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
+
+    glDisable(GL_DEPTH_TEST)
+    glEnable(GL_BLEND)
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+    glColor4f(0.0, 0.0, 0.0, 0.6)
+    glBegin(GL_QUADS)
+    glVertex2f(0, 0)
+    glVertex2f(WIDTH, 0)
+    glVertex2f(WIDTH, HEIGHT)
+    glVertex2f(0, HEIGHT)
+    glEnd()
+
+    glDisable(GL_BLEND)
+    glEnable(GL_DEPTH_TEST)
+
+    glMatrixMode(GL_MODELVIEW)
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
+
+def draw_main_menu():
+    glClearColor(0.1, 0.1, 0.2, 1.0)
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+    glColor3f(1.0, 1.0, 1.0)
+    draw_text_2d(WIDTH/2 - 100, HEIGHT - 100, "3D TOWER DEFENSE")
+    draw_text_2d(WIDTH/2 - 150, HEIGHT - 200, f"Selected Map: {G.get_selected_map_name()}")
+    draw_text_2d(WIDTH/2 - 150, HEIGHT - 250, "[S] Start Game")
+    draw_text_2d(WIDTH/2 - 150, HEIGHT - 300, "[M] Change Map")
+    draw_text_2d(WIDTH/2 - 150, HEIGHT - 350, "[Q] Quit")
+
+def draw_pause_menu():
+    draw_overlay()
+    glColor3f(1.0, 1.0, 1.0)
+    draw_text_2d(WIDTH/2 - 50, HEIGHT - 200, "PAUSED")
+    draw_text_2d(WIDTH/2 - 100, HEIGHT - 250, "[P] Resume Game")
+    draw_text_2d(WIDTH/2 - 100, HEIGHT - 300, "[R] Restart")
+    draw_text_2d(WIDTH/2 - 100, HEIGHT - 350, "[T] Return to Main Menu")
+    draw_text_2d(WIDTH/2 - 100, HEIGHT - 400, "[Q] Quit")
+
+def draw_game_over_screen():
+    draw_overlay()
+    glColor3f(1.0, 0.2, 0.2)
+    draw_text_2d(WIDTH/2 - 70, HEIGHT - 200, "GAME OVER")
+    glColor3f(1.0, 1.0, 1.0)
+    draw_text_2d(WIDTH/2 - 100, HEIGHT - 250, f"Final Score: {G.player.score}")
+    draw_text_2d(WIDTH/2 - 100, HEIGHT - 300, "[R] Restart")
+    draw_text_2d(WIDTH/2 - 100, HEIGHT - 350, "[T] Return to Main Menu")
 
 # global state
 G = GameState()
 
-# display
-def display():
+# Main drawing functions
+def draw_game_world():
     glViewport(0, 0, WIDTH, HEIGHT)
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-
     glMatrixMode(GL_PROJECTION)
     glLoadIdentity()
     gluPerspective(60.0, WIDTH / float(HEIGHT), 0.1, 300.0)
@@ -1063,15 +1132,28 @@ def display():
         G.abilities.mega_knight.draw(G.quadric)
 
     # hud
+    glColor3f(0.0, 0.0, 0.0)
     draw_text_2d(10, HEIGHT - 24, f"Health: {G.player.health}   Money: {G.player.money}   Score: {G.player.score}   Wave: {G.wave.wave_num}   Map: {G.map.name}")
-    draw_text_2d(10, HEIGHT - 48, "[1-0] Build Tower | F: Fast Fire | E: Explosive | M: Meteor | G: Mega Knight | Arrows: Camera")
+    draw_text_2d(10, HEIGHT - 48, "[P] Pause | [1-0] Build | F: Fast | E: Explosive | M: Meteor | G: Mega Knight | Arrows: Camera")
 
     mk = G.abilities.mega_knight
     if mk and mk.alive:
         info = f"MK Active: {mk.timer:.1f}s remaining"
         draw_text_2d(10, HEIGHT - 72, info)
     else:
-        draw_text_2d(10, HEIGHT - 72, f"MEGAKNIGHT: {abilitycost_mega_knight} Coins")
+        draw_text_2d(10, HEIGHT - 72, f"Mega Knight Cost: {abilitycost_mega_knight} | [G] to Summon")
+
+def display():
+    if G.game_state == 'MAIN_MENU':
+        draw_main_menu()
+    else:
+        glClearColor(sky_color[0], sky_color[1], sky_color[2], 1.0)
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        draw_game_world()
+        if G.game_state == 'PAUSED':
+            draw_pause_menu()
+        elif G.game_state == 'GAME_OVER':
+            draw_game_over_screen()
 
     glutSwapBuffers()
 
@@ -1079,45 +1161,78 @@ def display():
 # idle
 def idle():
     now = time.perf_counter()
+    if G.last_time == 0.0:
+        G.last_time = now
     dt = now - G.last_time
     G.last_time = now
-    if not G.paused:
+
+    if G.game_state == 'PLAYING':
         update_game(G, dt)
+
     glutPostRedisplay()
 
 # input
 def keyboard(key, x, y):
     k = key.decode('utf-8').lower()
     now = time.perf_counter()
-    
-    if k == 'p': 
-        G.paused = not G.paused
-    elif k in '1234567890': 
-        idx = 9 if k == '0' else (ord(k) - ord('1'))
-        build_tower_at_slot(G, idx)
-    elif k == 'f': 
-        activate_fast_attack(G, now)
-    elif k == 'e': 
-        activate_explosive(G, now)
-    elif k == 'm': 
-        activate_meteor(G)
-    elif k == 'g': 
-        G.activate_mega_knight()
-    elif k == 'q': 
-        import sys
-        sys.exit(0)
+
+    if G.game_state == 'MAIN_MENU':
+        if k == 's':
+            G.reset() 
+        elif k == 'm':
+            G.select_next_map()
+        elif k == 'q':
+            sys.exit(0)
+
+    elif G.game_state == 'PLAYING':
+        if k == 'p':
+            G.game_state = 'PAUSED'
+        elif k in '1234567890':
+            idx = 9 if k == '0' else (ord(k) - ord('1'))
+            build_tower_at_slot(G, idx)
+        elif k == 'f':
+            activate_fast_attack(G, now)
+        elif k == 'e':
+            activate_explosive(G, now)
+        elif k == 'm':
+            activate_meteor(G)
+        elif k == 'g':
+            G.activate_mega_knight()
+        elif k == 'q':
+            sys.exit(0)
+
+    elif G.game_state == 'PAUSED':
+        if k == 'p':
+            G.game_state = 'PLAYING'
+            G.last_time = time.perf_counter()
+        elif k == 'r':
+            G.reset()
+        elif k == 't':
+            G.game_state = 'MAIN_MENU'
+        elif k == 'q':
+            sys.exit(0)
+
+    elif G.game_state == 'GAME_OVER':
+        if k == 'r':
+            G.reset()
+        elif k == 't':
+            G.game_state = 'MAIN_MENU'
 
 def special(key, x, y):
+    if G.game_state != 'PLAYING':
+        return
     if key == GLUT_KEY_LEFT:
-        G.camera.yaw -= 3
+        G.camera.rotate -= 3
     if key == GLUT_KEY_RIGHT:
-        G.camera.yaw += 3
+        G.camera.rotate += 3
     if key == GLUT_KEY_UP:
         G.camera.pitch = clamp(G.camera.pitch + 2, 10, 80)
     if key == GLUT_KEY_DOWN:
         G.camera.pitch = clamp(G.camera.pitch - 2, 10, 80)
 
 def mouse(button, state, x, y):
+    if G.game_state != 'PLAYING':
+        return 
     if button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
         if G.abilities.mega_knight and G.abilities.mega_knight.alive and G.abilities.mega_knight.allow_manual:
             win_x, win_y = x, y
@@ -1145,7 +1260,6 @@ def init_glut():
 # main
 def main():
     init_glut()
-    G.player.money = float("inf")
     glutMainLoop()
 
 if __name__ == "__main__":
