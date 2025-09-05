@@ -105,7 +105,107 @@ Mohammadpur = MapPreset(
     camera_distance = 34.0
 )
 
-MAPS = {"Default" : DEFAULT_MAP, "Mohammadpur" : Mohammadpur}
+Male_Fantasy = MapPreset(
+    name = "Male Fantasy",
+    path_points = [
+        (-22.0, -16.0), (-16.0, -12.0), (-12.0, -8.0), (-8.0, -6.0),
+        (-6.0, -4.0), (-5.0, -2.0), (-5.0,  0.0),
+        (-4.0,  3.0), (-1.0,  5.0), ( 3.0,  4.0), ( 5.0,  0.0),
+        ( 3.0, -4.0), (-1.0, -5.0), (-4.0, -3.0), (-5.0,  0.0),
+        (-8.0,  0.0), (-7.0,  4.0), (-3.0,  7.0), ( 0.0,  8.0),
+        ( 3.0,  7.0), ( 7.0,  4.0), ( 8.0,  0.0), ( 7.0, -4.0),
+        ( 3.0, -7.0), ( 0.0, -8.0), (-3.0, -7.0), (-7.0, -4.0), (-8.0,  0.0),
+        (-8.0,  2.0), (-6.0,  3.5), (-4.0,  2.0), (-2.5,  0.0),
+        (-4.0, -2.0), (-6.0, -3.5), (-8.0, -2.0), (-8.0,  0.0),
+        (-6.0,  0.0), (-4.0,  0.0), (-2.5,  0.0), ( 0.0,  0.0),
+        ( 2.5,  0.0), ( 4.0,  2.0), ( 6.0,  3.5), ( 8.0,  2.0),
+        ( 9.5,  0.0), ( 8.0, -2.0), ( 6.0, -3.5), ( 4.0, -2.0), ( 2.5,  0.0),
+        ( 0.0,  8.0), ( 8.0,  6.0), (10.0,  0.0), (12.0,  4.0), (18.0, 10.0)
+    ],
+    tower_slots = [
+        (-6.0,  0.0), ( 6.0,  0.0), ( 0.0, -6.0), ( 0.0,  6.0),
+        (-9.0, -3.0), ( 9.0, -3.0), (-9.0,  3.0), ( 9.0,  3.0),
+        ( 0.0,  0.0), ( 0.0, 11.5)
+    ],
+    path_width = 1.25,
+    ground_scale = (80.0, 1.0, 60.0),
+    camera_distance = 38.0
+)
+
+Mountain_Peak = MapPreset(
+    name = "Mountain Peak",
+    path_points = [(-22.0, -20.0), (-14.0, -20.0), (-14.0, -12.0), (-22.0, -12.0),
+                   (-22.0, -2.0), (-12.0, -2.0), (-12.0, 8.0), (-20.0, 8.0),
+                   (-20.0, 18.0), (-10.0, 18.0), (0.0, 14.0), (8.0, 10.0),
+                   (8.0, 0.0), (-2.0, -2.0), (-2.0, 8.0), (6.0, 12.0),
+                   (14.0, 18.0), (18.0, 24.0)],
+    tower_slots = [(-18.0, -16.0), (-16.0, -4.0), (-15.0, 6.0), (-18.0, 14.0),
+                   (-6.0, 16.0), (2.0, 11.0), (10.0, 6.0), (10.0, -2.0),
+                   (0.0, -6.0), (12.0, 16.0)],
+    path_width = 1.6,
+    ground_scale = (80.0, 1.0, 60.0),
+    camera_distance = 36.0
+)
+
+Desert_Storm = MapPreset(
+    name = "Desert Storm",
+    path_points = [(-30.0, -12.0), (-18.0, -12.0), (-18.0, -4.0),
+                   (-6.0, -4.0), (-6.0, 4.0), (10.0, 4.0), (10.0, -6.0),
+                   (26.0, -6.0), (26.0, 6.0), (18.0, 12.0), (6.0, 12.0),
+                   (6.0, 22.0), (-12.0, 22.0), (-20.0, 16.0), (-26.0, 8.0),
+                   (-30.0, 0.0)],
+    tower_slots = [(-26.0, -10.0), (-12.0, -8.0), (0.0, -2.0), (8.0, -4.0),
+                   (20.0, -4.0), (22.0, 10.0), (10.0, 16.0), (0.0, 18.0),
+                   (-16.0, 14.0)],
+    path_width = 2.2,
+    ground_scale = (140.0, 1.0, 100.0),
+    camera_distance = 50.0
+)
+
+Swamp_Lands = MapPreset(
+    name = "Swamp Lands",
+    path_points = [(-16.0, -12.0), (-16.0, -6.0), (-10.0, -6.0),
+                   (-10.0, 0.0), (-4.0, 0.0), (-4.0, 8.0), (2.0, 8.0),
+                   (2.0, 2.0), (10.0, 2.0), (16.0, 6.0), (16.0, 14.0),
+                   (10.0, 18.0), (4.0, 18.0), (0.0, 14.0), (0.0, 10.0),
+                   (-6.0, 10.0), (-12.0, 14.0)],
+    tower_slots = [(-14.0, -8.0), (-8.0, -4.0), (-2.0, 2.0), (4.0, 6.0),
+                   (8.0, 0.0), (12.0, 10.0), (6.0, 16.0), (-2.0, 14.0),
+                   (-8.0, 12.0)],
+    path_width = 1.7,
+    ground_scale = (80.0, 1.0, 70.0),
+    camera_distance = 34.0
+)
+
+Cityscape = MapPreset(
+    name = "Cityscape",
+    path_points = [(-34.0, -24.0), (-34.0, -14.0), (-22.0, -14.0),
+                   (-22.0, -4.0), (-8.0, -4.0), (4.0, 0.0), (4.0, 10.0),
+                   (-6.0, 16.0), (4.0, 24.0), (16.0, 24.0), (24.0, 20.0),
+                   (30.0, 12.0), (24.0, 6.0), (14.0, 6.0), (8.0, 0.0),
+                   (-4.0, -8.0), (-10.0, -8.0)],
+    tower_slots = [(-32.0, -20.0), (-24.0, -10.0), (-10.0, -4.0), (6.0, 2.0),
+                   (0.0, 12.0), (10.0, 18.0), (22.0, 22.0), (26.0, 10.0),
+                   (12.0, 4.0)],
+    path_width = 1.3,
+    ground_scale = (120.0, 1.0, 100.0),
+    camera_distance = 58.0
+)
+
+Forest_Adventure = MapPreset(
+    name = "Forest Adventure",
+    path_points = [(-12.0, -12.0), (-12.0, -4.0), (-6.0, -4.0),
+                   (-2.0, -6.0), (2.0, -4.0), (4.0, 0.0), (2.0, 4.0),
+                   (-2.0, 6.0), (-6.0, 6.0), (-8.0, 10.0), (-10.0, 14.0)],
+    tower_slots = [(-11.0, -6.0), (-7.0, -6.5), (-1.0, -6.0), (3.0, -1.0),
+                   (1.0, 3.0), (-6.5, 7.0), (-9.0, 12.0)],
+    path_width = 1.6,
+    ground_scale = (55.0, 1.0, 40.0),
+    camera_distance = 24.0
+)
+
+
+MAPS = {"Default" : DEFAULT_MAP, "Mohammadpur" : Mohammadpur, "Male Fantasy": Male_Fantasy, "Swamp Lands" : Swamp_Lands, "Cityscape" : Cityscape, "Desert Storm": Desert_Storm, "Mountain Peak": Mountain_Peak}
 
 def dist2D(ax, az, bx, bz):
     return math.hypot(bx - ax, bz - az)
@@ -133,7 +233,43 @@ class Enemy:
 
     def is_dead(self):
         return self.health <= 0 or not self.alive
+    
+def enemy_velocity(e, path):
+    nxt_idx = min(e.path_idx + 1, len(path) - 1)
+    tx, tz = path[nxt_idx]
+    nx, nz = normalize2D(tx - e.x, tz - e.z)
 
+    return (nx * e.speed, nz * e.speed)
+
+def lead_direction(shooter_x, shooter_z, target_x, target_z, vtx, vtz, proj_speed):
+    rx = target_x - shooter_x
+    rz = target_z - shooter_z
+
+    a = (vtx * vtx + vtz * vtz) - proj_speed * proj_speed
+    b = 2.0 * (rx * vtx + rz * vtz)
+    c = rx * rx + rz * rz
+
+    t = 0.0
+    if abs(a) < 1e-6:
+        if abs(b) > 1e-6:
+            t = -c / b
+        else:
+            t = 0.0
+    else:
+        disc = b * b - 4 * a * c
+
+        if disc >= 0.0:
+            sqrt_disc = math.sqrt(disc)
+            t1 = (-b - sqrt_disc) / (2*a)
+            t2 = (-b + sqrt_disc) / (2*a)
+            candidates = [tt for tt in (t1, t2) if tt > 0.0]
+            t = min(candidates) if candidates else 0.0
+        else:
+            t = 0.0
+
+    aim_x = rx + vtx * t
+    aim_z = rz + vtz * t
+    return normalize2D(aim_x, aim_z)
 
 class Projectile:
     def __init__(self, x, y, z, dir_x, dir_y, dir_z, speed, damage, explosive = False):
@@ -636,7 +772,7 @@ class WaveManager:
             if self.time_to_next <= 0:
                 self.time_to_next = self.spawn_interval
                 self.to_spawn -= 1
-                spawn_enemy(game, speed = 1.2 + 0.05 * self.wave_num, health = 60 + 10 * self.wave_num)
+                spawn_enemy(game, speed = 3 + 0.05 * self.wave_num, health = 60 + 10 * self.wave_num)
 
                 if not self.middle_boss_spawned and self.to_spawn <= self.wave_num:
                     self.middle_boss_spawned = True
@@ -839,19 +975,23 @@ def update_towers(game, dt):
     for slot in game.tower_slots:
         if not (slot.occupied and slot.tower.active):
             continue
+
         t = slot.tower
-        t.cooldown -= dt  
+        t.cooldown -= dt
         target = acquire_target(t, game.enemies)
 
         if target and dist2D(t.x, t.z, target.x, target.z) <= t.range:
-            dx = target.x - t.x
-            dz = target.z - t.z
-            t.rotate_degree = math.degrees(math.atan2(dz, dx))
+            
+            vtx, vtz = enemy_velocity(target, game.map.path_points)
+            dir_x, dir_z = lead_direction(t.x, t.z, target.x, target.z, vtx, vtz, t.projectile_speed)
+
+            t.rotate_degree = math.degrees(math.atan2(dir_x, dir_z))
 
             if t.cooldown <= 0.0:
                 t.cooldown = t.effective_interval(game.abilities)
-                dir_x, dir_z = normalize2D(dx, dz)
-                game.projectiles.append(Projectile(t.x, t.y + 1.0, t.z, dir_x, 0.1, dir_z, t.projectile_speed, t.damage, game.abilities.explosive_active))
+                game.projectiles.append(
+                    Projectile(t.x, t.y + 1.0, t.z, dir_x, 0.0, dir_z, t.projectile_speed, t.damage, game.abilities.explosive_active)
+                )
 
 def update_projectiles(game, dt):
     alive_proj = []
