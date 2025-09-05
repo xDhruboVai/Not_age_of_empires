@@ -28,14 +28,14 @@ ground_y = 0.0
 # boss
 boss_base_hp = 400
 boss_hp_wave_scale = 80
-boss_speed = 0.8
+boss_speed = 1
 boss_radius = 0.9
 boss_reward = 120
 
 # enemies / towers / bullets
 enemy_radius = 0.35
 bullet_radius = 0.12
-tower_default_radius = 4.0
+tower_default_radius = 6.0
 tower_firerate = 0.9
 tower_dmg = 20
 bullet_speed = 8.0
@@ -48,8 +48,8 @@ leak_dmg = 10
 
 # cheats
 cheatcost_fast = 100
-cheatcose_explosive = 150
-cheatcose_meteor = 200
+cheatcost_exposive = 150
+cheatcost_megaknight = 200
 cheat_fast_duration = 10.0
 cheat_explosive_duration = 10.0
 cheat_fast_multiplier = 2.0
@@ -182,7 +182,7 @@ class TowerSlot:
 class Player:
     def __init__(self):
         self.health = player_hp
-        self.money = 120
+        self.money = float("inf")
         self.score = 0
 
 # cheats
@@ -321,17 +321,17 @@ def activate_fast_attack(game, now):
     return True
 
 def activate_explosive(game, now):
-    if game.player.money < cheatcose_explosive:
+    if game.player.money < cheatcost_exposive:
         return False
-    game.player.money -= cheatcose_explosive
+    game.player.money -= cheatcost_exposive
     game.cheats.explosive_active = True
     game.cheats.explosive_ends_at = now + cheat_explosive_duration
     return True
 
 def activate_meteor(game):
-    if game.player.money < cheatcose_meteor:
+    if game.player.money < cheatcost_megaknight:
         return False
-    game.player.money -= cheatcose_meteor
+    game.player.money -= cheatcost_megaknight
     if game.enemies:
         tx = sum(e.x for e in game.enemies) / len(game.enemies)
         tz = sum(e.z for e in game.enemies) / len(game.enemies)
@@ -631,7 +631,7 @@ def draw_projectile(p, quadric):
 def draw_meteor(m, quadric):
     glPushMatrix()
     glTranslatef(m.x, m.y, m.z)
-    glColor3f(0.9, 0.3, 0.1)
+    glColor3f(0, 0, 0)
     gluSphere(quadric, m.radius, 14, 10)
     glPopMatrix()
 
@@ -693,7 +693,7 @@ def display():
 
     # hud
     draw_text_2d(10, HEIGHT - 24, f"Health: {G.player.health}   Money: {G.player.money}   Score: {G.player.score}   Wave: {G.wave.wave_num}   Map: {G.map.name}")
-    draw_text_2d(10, HEIGHT - 48, "[1-0] Build Tower | F: Fast Fire | E: Explosive | M: Meteor | Arrows: Camera")
+    draw_text_2d(10, HEIGHT - 48, "[1-0] Build Tower | F: Fast Fire | E: Explosive | M: MEGAKNIGHT | Arrows: Camera")
 
     glutSwapBuffers()
 
@@ -759,7 +759,7 @@ def init_glut():
 # main
 def main():
     init_glut()
-    G.player.money = 1000
+    G.player.money = float("inf")
     glutMainLoop()
 
 if __name__ == "__main__":
