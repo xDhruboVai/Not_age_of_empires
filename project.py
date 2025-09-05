@@ -46,13 +46,13 @@ tower_cost = 75
 kill_reward = 15
 leak_dmg = 10
 
-# cheats
-cheatcost_fast = 100
-cheatcost_exposive = 150
-cheatcost_megaknight = 200
-cheat_fast_duration = 10.0
-cheat_explosive_duration = 10.0
-cheat_fast_multiplier = 2.0
+# abilities
+abilitycost_fast = 100
+abilitycost_explosive = 150
+abilitycost_meteor = 200
+ability_fast_duration = 10.0
+ability_explosive_duration = 10.0
+ability_fast_multiplier = 2.0
 
 # meteor
 meteor_fall_speed = 14.0
@@ -164,10 +164,10 @@ class Tower:
         self.yaw_deg = 0.0
         self.active = True
 
-    def effective_interval(self, cheats):
+    def effective_interval(self, abilities):
         interval = self.base_fire_interval
-        if cheats.fast_attack_active:
-            interval = interval / cheat_fast_multiplier
+        if abilities.fast_attack_active:
+            interval = interval / ability_fast_multiplier
         return interval
 
 # tower slot
@@ -185,8 +185,8 @@ class Player:
         self.money = float("inf")
         self.score = 0
 
-# cheats
-class Cheats:
+# abilities
+class Abilities:
     def __init__(self):
         self.fast_attack_active = False
         self.fast_attack_ends_at = 0.0
@@ -279,7 +279,7 @@ class GameState:
     def __init__(self):
         self.map = MAPS["Mohammadpur"]
         self.player = Player()
-        self.cheats = Cheats()
+        self.abilities = Abilities()
         self.wave = WaveManager()
         self.enemies = []
         self.projectiles = []
@@ -313,38 +313,38 @@ def build_tower_at_slot(game, slot_idx):
     return True
 
 def activate_fast_attack(game, now):
-    if game.player.money < cheatcost_fast:
+    if game.player.money < abilitycost_fast:
         return False
-    game.player.money -= cheatcost_fast
-    game.cheats.fast_attack_active = True
-    game.cheats.fast_attack_ends_at = now + cheat_fast_duration
+    game.player.money -= abilitycost_fast
+    game.abilities.fast_attack_active = True
+    game.abilities.fast_attack_ends_at = now + ability_fast_duration
     return True
 
 def activate_explosive(game, now):
-    if game.player.money < cheatcost_exposive:
+    if game.player.money < abilitycost_explosive:
         return False
-    game.player.money -= cheatcost_exposive
-    game.cheats.explosive_active = True
-    game.cheats.explosive_ends_at = now + cheat_explosive_duration
+    game.player.money -= abilitycost_explosive
+    game.abilities.explosive_active = True
+    game.abilities.explosive_ends_at = now + ability_explosive_duration
     return True
 
 def activate_meteor(game):
-    if game.player.money < cheatcost_megaknight:
+    if game.player.money < abilitycost_meteor:
         return False
-    game.player.money -= cheatcost_megaknight
+    game.player.money -= abilitycost_meteor
     if game.enemies:
         tx = sum(e.x for e in game.enemies) / len(game.enemies)
         tz = sum(e.z for e in game.enemies) / len(game.enemies)
     else:
         mid = len(game.map.path_points) // 2
         tx, tz = game.map.path_points[mid]
-    game.cheats.meteors.append(Meteor(tx, tz))
+    game.abilities.meteors.append(Meteor(tx, tz))
     return True
 
 # updates
 def update_game(game, dt):
     now = time.perf_counter()
-    game.cheats.update(now)
+    game.abilities.update(now)
     game.wave.update(dt, game)
     update_enemies(game, dt)
     update_towers(game, dt)
@@ -395,7 +395,7 @@ def update_towers(game, dt):
             dx, dz = (target.x - t.x), (target.z - t.z)
             t.yaw_deg = math.degrees(math.atan2(dx, dz))
             if t.cooldown <= 0.0:
-                t.cooldown = t.effective_interval(game.cheats)
+                t.cooldown = t.effective_interval(game.abilities)
                 dir_x, dir_z = normalize2D(dx, dz)
                 dir_y = 0.1
                 proj = Projectile(
@@ -403,7 +403,7 @@ def update_towers(game, dt):
                     dir_x = dir_x, dir_y = dir_y, dir_z = dir_z,
                     speed = t.projectile_speed,
                     damage = t.damage,
-                    explosive = game.cheats.explosive_active
+                    explosive = game.abilities.explosive_active
                 )
                 game.projectiles.append(proj)
 
@@ -450,7 +450,7 @@ def update_projectiles(game, dt):
 
 def update_meteors(game, dt):
     remaining = []
-    for m in game.cheats.meteors:
+    for m in game.abilities.meteors:
         if m.alive:
             m.update(dt)
             if m.alive:
@@ -470,7 +470,7 @@ def update_meteors(game, dt):
                     e.alive = False
                     game.player.money += kill_reward
                     game.player.score += 10
-    game.cheats.meteors = remaining
+    game.abilities.meteors = remaining
 
 # ui text
 def draw_text_2d(x, y, s):
@@ -688,12 +688,12 @@ def display():
         draw_enemy(e, G.quadric)
     for p in G.projectiles:
         draw_projectile(p, G.quadric)
-    for m in G.cheats.meteors:
+    for m in G.abilities.meteors:
         draw_meteor(m, G.quadric)
 
     # hud
     draw_text_2d(10, HEIGHT - 24, f"Health: {G.player.health}   Money: {G.player.money}   Score: {G.player.score}   Wave: {G.wave.wave_num}   Map: {G.map.name}")
-    draw_text_2d(10, HEIGHT - 48, "[1-0] Build Tower | F: Fast Fire | E: Explosive | M: MEGAKNIGHT | Arrows: Camera")
+    draw_text_2d(10, HEIGHT - 48, "[1-0] Build Tower | F: Fast Fire | E: Explosive | M: Meteor | Arrows: Camera")
 
     glutSwapBuffers()
 
