@@ -50,9 +50,11 @@ leak_dmg = 10
 abilitycost_fast = 100
 abilitycost_explosive = 150
 abilitycost_meteor = 200
+abilitycost_mega_knight = 500   
 ability_fast_duration = 10.0
 ability_explosive_duration = 10.0
 ability_fast_multiplier = 2.0
+mega_knight_duration = 20.0 
 
 # meteor
 meteor_fall_speed = 14.0
@@ -80,10 +82,10 @@ class MapPreset:
 
 DEFAULT_MAP = MapPreset(
     name = "Default",
-    path_points = [(-8.0, -6.0), (-8.0, -2.0), (-4.0, -2.0), (0.0, -2.0), (0.0, 2.0), (5.0, 2.0), (8.0, 2.0)],
-    tower_slots = [(-9.5, -4.0), (-6.0, -3.5), (-2.5, -3.0), (1.5, -3.0), (1.5, 3.0), (4.0, 3.0), (7.0, 3.0)],
+    path_points = [(-4.0, -4.0), (-4.0, -2.0), (0.0, -2.0), (2.0, -2.0), (2.0, 2.0), (4.0, 2.0)],  
+    tower_slots = [(-5.5, -2.0), (-2.0, -1.5), (0.5, -1.0), (2.0, -1.0), (1.5, 2.0), (3.5, 2.0)],  
     path_width = 1.2,
-    ground_scale = (30.0, 1.0, 20.0),
+    ground_scale = (20.0, 1.0, 15.0), 
     camera_distance = 16.0
 )
 
@@ -101,7 +103,7 @@ Mohammadpur = MapPreset(
 )
 
 MAPS = {"Default": DEFAULT_MAP, "Mohammadpur": Mohammadpur}
-SELECTED_MAP = "Mohammadpur"
+SELECTED_MAP = "Default"
 
 # math helpers
 def dist2D(ax, az, bx, bz):
@@ -193,29 +195,346 @@ class Abilities:
         self.explosive_active = False
         self.explosive_ends_at = 0.0
         self.meteors = []
+        self.mega_knight = None
 
-    def update(self, now):
+    def update(self, now, dt):
         if self.fast_attack_active and now >= self.fast_attack_ends_at:
             self.fast_attack_active = False
         if self.explosive_active and now >= self.explosive_ends_at:
             self.explosive_active = False
 
-# meteor
+        if self.mega_knight and self.mega_knight.alive:
+            self.mega_knight.update(dt)
+
+    def activate_mega_knight(self, game):
+        if game.player.money < abilitycost_mega_knight:
+            return False
+        game.player.money -= abilitycost_mega_knight
+        self.mega_knight = MegaKnight()
+
+        self.mega_knight.x = 0.0
+        self.mega_knight.z = 0.0
+        self.mega_knight.y = ground_y + 0.5
+        self.mega_knight.active = True
+        self.mega_knight.timer = mega_knight_duration
+        return True
+
+class MegaKnight:
+    def __init__(self):
+        self.x = 0.0
+        self.z = 0.0
+        self.y = ground_y + 0.5
+        self.radius = 2.0
+        self.health = 1000
+        self.alive = True
+
+        # movement + detection
+        self.walk_speed = 7.0
+        self.detect_radius = 15.0
+
+        # charge + jump
+        self.charge_time = 2
+        self.charge_timer = 0.0
+        self.is_charging = False
+
+        self.jump_duration = 0.8
+        self.jump_time = 0.0
+        self.jump_height = 8.0
+        self.start_x = 0.0
+        self.start_z = 0.0
+        self.lock_x = None
+        self.lock_z = None
+
+        # damage
+        self.landing_damage = 220.0  
+        self.aoe_radius = 5.0   
+
+        self.active = False
+        self.timer = 0.0  
+
+        # facing
+        self.yaw_deg = 0.0
+        self.allow_manual = False
+
+    def update(self, dt):
+        if not self.active or not self.alive:
+            return
+
+        self.timer -= dt
+        if self.timer <= 0.0:
+            self.alive = False
+            return
+
+        if self.jump_time > 0.0:
+            if self.lock_x is not None:
+                dx, dz = (self.lock_x - self.x), (self.lock_z - self.z)
+                if abs(dx) + abs(dz) > 1e-5:
+                    self.yaw_deg = math.degrees(math.atan2(dx, dz))
+
+            t_left = self.jump_time - dt
+            if t_left < 0.0:
+                t_left = 0.0
+            progress = 1.0 - (t_left / self.jump_duration if self.jump_duration > 1e-6 else 1.0)
+
+            if self.lock_x is None:
+                self.lock_x = self.x
+                self.lock_z = self.z
+
+            nx = self.start_x + (self.lock_x - self.start_x) * progress
+            nz = self.start_z + (self.lock_z - self.start_z) * progress
+            ny = ground_y + 0.5 + 4.0 * self.jump_height * progress * (1.0 - progress)
+
+            self.x, self.z, self.y = nx, nz, ny
+            self.jump_time = t_left
+
+            if self.jump_time <= 0.0:
+                # land
+                self.x = self.lock_x
+                self.z = self.lock_z
+                self.y = ground_y + 0.5
+                self.deal_landing_damage()
+                # reset state
+                self.is_charging = False
+                self.charge_timer = 0.0
+                self.lock_x = None
+                self.lock_z = None
+            return
+
+        if self.is_charging:
+            if self.lock_x is not None:
+                dx, dz = (self.lock_x - self.x), (self.lock_z - self.z)
+                if abs(dx) + abs(dz) > 1e-5:
+                    self.yaw_deg = math.degrees(math.atan2(dx, dz))
+            self.charge_timer -= dt
+            if self.charge_timer <= 0.0 and self.lock_x is not None:
+                self.start_x = self.x
+                self.start_z = self.z
+                self.jump_time = self.jump_duration
+            return
+
+        base_x, base_z = G.map.path_points[-1]
+        front = None
+        best_goal_dist = 1e9
+        for e in G.enemies:
+            if not e.alive:
+                continue
+            gd = dist2D(e.x, e.z, base_x, base_z)
+            if gd < best_goal_dist:
+                best_goal_dist = gd
+                front = e
+
+        if front:
+            dx, dz = (front.x - self.x), (front.z - self.z)
+            ndx, ndz = normalize2D(dx, dz)
+            self.x += ndx * self.walk_speed * dt
+            self.z += ndz * self.walk_speed * dt
+
+            if abs(dx) + abs(dz) > 1e-5:
+                self.yaw_deg = math.degrees(math.atan2(dx, dz))
+
+            cand = None
+            cand_goal = 1e9
+            for e in G.enemies:
+                if not e.alive:
+                    continue
+                if dist2D(self.x, self.z, e.x, e.z) <= self.detect_radius:
+                    gd = dist2D(e.x, e.z, base_x, base_z)
+                    if gd < cand_goal:
+                        cand_goal = gd
+                        cand = e
+            if cand:
+                self.lock_x = cand.x
+                self.lock_z = cand.z
+                self.is_charging = True
+                self.charge_timer = self.charge_time
+
+    def start_jump(self, dir_x, dir_z):
+        mag = math.hypot(dir_x, dir_z)
+        if mag <= 1e-6:
+            return
+        dir_x, dir_z = (dir_x / mag, dir_z / mag)
+        self.start_x = self.x
+        self.start_z = self.z
+        self.lock_x = self.x + dir_x * 10.0
+        self.lock_z = self.z + dir_z * 10.0
+        self.is_charging = False
+        self.charge_timer = 0.0
+        self.jump_time = self.jump_duration
+
+    def deal_landing_damage(self):
+        for e in G.enemies:
+            if not e.alive:
+                continue
+            if dist2D(self.x, self.z, e.x, e.z) <= self.aoe_radius:
+                e.health -= self.landing_damage
+                if e.health <= 0 and e.alive:
+                    e.alive = False
+                    G.player.money += (boss_reward if e.is_boss else kill_reward)
+                    G.player.score += (50 if e.is_boss else 10)
+
+    def draw(self, quadric):
+        if not self.alive:
+            return
+        glPushMatrix()
+
+        s = self.radius
+        base_lift = 1.09 * s - 0.5 
+        glTranslatef(self.x, self.y + base_lift, self.z)
+        glRotatef(self.yaw_deg, 0, 1, 0) 
+
+        s = self.radius
+
+        # cape (back)
+        glPushMatrix()
+        glTranslatef(0.0, 0.8 * s, -0.5 * s)
+        glColor3f(0.06, 0.12, 0.55)
+        glScalef(1.0 * s, 1.3 * s, 0.08 * s)
+        glutSolidCube(1.0)
+        glPopMatrix()
+
+        # torso (armor)
+        glPushMatrix()
+        glTranslatef(0.0, 0.55 * s, 0.0)
+        glColor3f(0.42, 0.44, 0.50)
+        glScalef(1.5 * s, 1.1 * s, 1.0 * s)
+        glutSolidCube(1.0)
+        glPopMatrix()
+
+        # chest plate accent
+        glPushMatrix()
+        glTranslatef(0.0, 0.7 * s, 0.45 * s)
+        glColor3f(0.18, 0.20, 0.24)
+        glScalef(0.9 * s, 0.4 * s, 0.08 * s)
+        glutSolidCube(1.0)
+        glPopMatrix()
+
+        # belt
+        glPushMatrix()
+        glTranslatef(0.0, 0.12 * s, 0.0)
+        glColor3f(0.35, 0.25, 0.15)
+        glScalef(1.3 * s, 0.25 * s, 0.95 * s)
+        glutSolidCube(1.0)
+        glPopMatrix()
+
+        # belt buckle
+        glPushMatrix()
+        glTranslatef(0.0, 0.12 * s, 0.49 * s)
+        glColor3f(0.85, 0.65, 0.20)
+        glScalef(0.35 * s, 0.2 * s, 0.06 * s)
+        glutSolidCube(1.0)
+        glPopMatrix()
+
+        # shoulder pads
+        glPushMatrix()
+        glTranslatef(-0.95 * s, 1.05 * s, 0.0)
+        glColor3f(0.20, 0.20, 0.25)
+        gluSphere(quadric, 0.42 * s, sphere_slices, sphere_stacks)
+        glPopMatrix()
+
+        glPushMatrix()
+        glTranslatef(0.95 * s, 1.05 * s, 0.0)
+        glColor3f(0.20, 0.20, 0.25)
+        gluSphere(quadric, 0.42 * s, sphere_slices, sphere_stacks)
+        glPopMatrix()
+
+        # upper arms
+        glPushMatrix()
+        glTranslatef(-1.15 * s, 0.7 * s, 0.0)
+        glColor3f(0.28, 0.28, 0.35)
+        glScalef(0.35 * s, 0.75 * s, 0.35 * s)
+        glutSolidCube(1.0)
+        glPopMatrix()
+
+        glPushMatrix()
+        glTranslatef(1.15 * s, 0.7 * s, 0.0)
+        glColor3f(0.28, 0.28, 0.35)
+        glScalef(0.35 * s, 0.75 * s, 0.35 * s)
+        glutSolidCube(1.0)
+        glPopMatrix()
+
+        # gauntlets (hands)
+        glPushMatrix()
+        glTranslatef(-1.2 * s, 0.25 * s, 0.0)
+        glColor3f(0.10, 0.10, 0.12)
+        gluSphere(quadric, 0.24 * s, sphere_slices, sphere_stacks)
+        glPopMatrix()
+
+        glPushMatrix()
+        glTranslatef(1.2 * s, 0.25 * s, 0.0)
+        glColor3f(0.10, 0.10, 0.12)
+        gluSphere(quadric, 0.24 * s, sphere_slices, sphere_stacks)
+        glPopMatrix()
+
+        # legs (small)
+        glPushMatrix()
+        glTranslatef(-0.38 * s, -0.35 * s, 0.0)
+        glColor3f(0.25, 0.25, 0.30)
+        glScalef(0.35 * s, 0.85 * s, 0.38 * s)
+        glutSolidCube(1.0)
+        glPopMatrix()
+
+        glPushMatrix()
+        glTranslatef(0.38 * s, -0.35 * s, 0.0)
+        glColor3f(0.25, 0.25, 0.30)
+        glScalef(0.35 * s, 0.85 * s, 0.38 * s)
+        glutSolidCube(1.0)
+        glPopMatrix()
+
+        # boots
+        glPushMatrix()
+        glTranslatef(-0.38 * s, -0.95 * s, 0.1 * s)
+        glColor3f(0.10, 0.10, 0.12)
+        glScalef(0.7 * s, 0.28 * s, 1.0 * s)
+        glutSolidCube(1.0)
+        glPopMatrix()
+
+        glPushMatrix()
+        glTranslatef(0.38 * s, -0.95 * s, 0.1 * s)
+        glColor3f(0.10, 0.10, 0.12)
+        glScalef(0.7 * s, 0.28 * s, 1.0 * s)
+        glutSolidCube(1.0)
+        glPopMatrix()
+
+        # head (helmet dome)
+        glPushMatrix()
+        glTranslatef(0.0, 1.25 * s, 0.0)
+        glColor3f(0.30, 0.31, 0.34)
+        gluSphere(quadric, 0.38 * s, sphere_slices, sphere_stacks)
+        glPopMatrix()
+
+        # visor
+        glPushMatrix()
+        glTranslatef(0.0, 1.15 * s, 0.38 * s)
+        glColor3f(0.05, 0.05, 0.08)
+        glScalef(0.55 * s, 0.20 * s, 0.07 * s)
+        glutSolidCube(1.0)
+        glPopMatrix()
+
+        # helmet crest
+        glPushMatrix()
+        glTranslatef(0.0, 1.55 * s, 0.0)
+        glColor3f(0.15, 0.30, 0.85)
+        glScalef(0.35 * s, 0.45 * s, 0.35 * s)
+        glutSolidCube(1.0)
+        glPopMatrix()
+
+        glPopMatrix()
+
+# Meteor
 class Meteor:
-    def __init__(self, target_x, target_z):
-        self.x = target_x
-        self.z = target_z
-        self.y = 10.0
-        self.vy = -meteor_fall_speed
+    def __init__(self, x, z):
+        self.x = x
+        self.z = z
+        self.y = 40.0
         self.radius = meteor_radius
-        self.aoe = meteor_aoe_radius
-        self.damage = 99999999
+        self.speed = meteor_fall_speed
         self.alive = True
 
     def update(self, dt):
-        self.y += self.vy * dt
-        if self.y <= ground_y + self.radius:
-            self.y = ground_y + self.radius
+        if not self.alive:
+            return
+        self.y -= self.speed * dt
+        if self.y <= ground_y + 0.1:
             self.alive = False
 
 # waves
@@ -228,6 +547,7 @@ class WaveManager:
         self.between_waves = 4.0
         self.resting = False
         self.boss_spawned = False
+        self.middle_boss_spawned = False 
 
     def update(self, dt, game):
         if self.resting:
@@ -235,6 +555,7 @@ class WaveManager:
             if self.time_to_next <= 0:
                 self.resting = False
                 self.boss_spawned = False
+                self.middle_boss_spawned = False 
                 self.to_spawn = 8 + self.wave_num * 2
                 self.spawn_interval = max(0.4, 1.2 - 0.05 * self.wave_num)
                 self.time_to_next = self.spawn_interval
@@ -246,17 +567,25 @@ class WaveManager:
                 self.time_to_next = self.spawn_interval
                 self.to_spawn -= 1
                 spawn_enemy(game, speed = 1.2 + 0.05 * self.wave_num, health = 60 + 10 * self.wave_num)
+
+                if not self.middle_boss_spawned and self.to_spawn <= self.wave_num:  
+                    self.middle_boss_spawned = True
+                    spawn_boss(game) 
+
             return
 
         if not self.boss_spawned:
             self.boss_spawned = True
-            spawn_boss(game)
+            num_bosses = math.ceil(self.wave_num / 3) 
+            for _ in range(num_bosses):
+                spawn_boss(game)
             return
 
         if not any(e.alive for e in game.enemies):
             self.resting = True
             self.wave_num += 1
             self.time_to_next = self.between_waves
+
 
 # camera
 class Camera:
@@ -290,10 +619,14 @@ class GameState:
         self.last_time = time.perf_counter()
         self.paused = False
 
+    def activate_mega_knight(self):
+        if not self.abilities.activate_mega_knight(self):
+            print("Not enough money for Mega Knight!")
+
 # spawn
 def spawn_enemy(game, speed, health):
     x0, z0 = game.map.path_points[0]
-    game.enemies.append(Enemy(x0, z0, speed, health, is_boss = False))
+    game.enemies.append(Enemy(x0, z0, speed * 1.5, health, is_boss = False))
 
 def spawn_boss(game):
     x0, z0 = game.map.path_points[0]
@@ -332,19 +665,21 @@ def activate_meteor(game):
     if game.player.money < abilitycost_meteor:
         return False
     game.player.money -= abilitycost_meteor
+
     if game.enemies:
-        tx = sum(e.x for e in game.enemies) / len(game.enemies)
-        tz = sum(e.z for e in game.enemies) / len(game.enemies)
+        tx = min(game.enemies, key=lambda e: dist2D(e.x, e.z, game.map.path_points[-1][0], game.map.path_points[-1][1])).x
+        tz = min(game.enemies, key=lambda e: dist2D(e.x, e.z, game.map.path_points[-1][0], game.map.path_points[-1][1])).z
     else:
         mid = len(game.map.path_points) // 2
         tx, tz = game.map.path_points[mid]
     game.abilities.meteors.append(Meteor(tx, tz))
     return True
 
+
 # updates
 def update_game(game, dt):
     now = time.perf_counter()
-    game.abilities.update(now)
+    game.abilities.update(now, dt)
     game.wave.update(dt, game)
     update_enemies(game, dt)
     update_towers(game, dt)
@@ -456,7 +791,7 @@ def update_meteors(game, dt):
             if m.alive:
                 remaining.append(m)
                 continue
-            # impact: wipe the board; boss loses 50% of remaining HP
+            # impact: wipe the board, boss loses 50% of remaining HP
             for e in game.enemies:
                 if not e.alive:
                     continue
@@ -631,7 +966,7 @@ def draw_projectile(p, quadric):
 def draw_meteor(m, quadric):
     glPushMatrix()
     glTranslatef(m.x, m.y, m.z)
-    glColor3f(0, 0, 0)
+    glColor3f(0.9, 0.3, 0.3)  # Red color for meteor
     gluSphere(quadric, m.radius, 14, 10)
     glPopMatrix()
 
@@ -691,11 +1026,22 @@ def display():
     for m in G.abilities.meteors:
         draw_meteor(m, G.quadric)
 
+    if G.abilities.mega_knight and G.abilities.mega_knight.alive:
+        G.abilities.mega_knight.draw(G.quadric)
+
     # hud
     draw_text_2d(10, HEIGHT - 24, f"Health: {G.player.health}   Money: {G.player.money}   Score: {G.player.score}   Wave: {G.wave.wave_num}   Map: {G.map.name}")
-    draw_text_2d(10, HEIGHT - 48, "[1-0] Build Tower | F: Fast Fire | E: Explosive | M: Meteor | Arrows: Camera")
+    draw_text_2d(10, HEIGHT - 48, "[1-0] Build Tower | F: Fast Fire | E: Explosive | M: Meteor | G: Mega Knight | Arrows: Camera")
+
+    mk = G.abilities.mega_knight
+    if mk and mk.alive:
+        info = f"MK Active: {mk.timer:.1f}s remaining"
+        draw_text_2d(10, HEIGHT - 72, info)
+    else:
+        draw_text_2d(10, HEIGHT - 72, f"MEGAKNIGHT: {abilitycost_mega_knight} Coins")
 
     glutSwapBuffers()
+
 
 # idle
 def idle():
@@ -710,18 +1056,21 @@ def idle():
 def keyboard(key, x, y):
     k = key.decode('utf-8').lower()
     now = time.perf_counter()
-    if k == 'p':
+    
+    if k == 'p': 
         G.paused = not G.paused
-    elif k in '1234567890':
+    elif k in '1234567890': 
         idx = 9 if k == '0' else (ord(k) - ord('1'))
         build_tower_at_slot(G, idx)
-    elif k == 'f':
+    elif k == 'f': 
         activate_fast_attack(G, now)
-    elif k == 'e':
+    elif k == 'e': 
         activate_explosive(G, now)
-    elif k == 'm':
+    elif k == 'm': 
         activate_meteor(G)
-    elif k == 'q':
+    elif k == 'g': 
+        G.activate_mega_knight()
+    elif k == 'q': 
         import sys
         sys.exit(0)
 
@@ -736,8 +1085,12 @@ def special(key, x, y):
         G.camera.pitch = clamp(G.camera.pitch - 2, 10, 80)
 
 def mouse(button, state, x, y):
-    # no mouse picking per assignment
-    pass
+    if button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
+        if G.abilities.mega_knight and G.abilities.mega_knight.alive and G.abilities.mega_knight.allow_manual:
+            win_x, win_y = x, y
+            direction_x = (win_x - WIDTH / 2) / WIDTH
+            direction_z = (win_y - HEIGHT / 2) / HEIGHT
+            G.abilities.mega_knight.start_jump(direction_x, direction_z)
 
 # init
 def init_glut():
