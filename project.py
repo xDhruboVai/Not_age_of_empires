@@ -1255,40 +1255,91 @@ def draw_tower(t, quadric):
 
     glTranslatef(t.x, t.y, t.z)
     glRotatef(t.rotate_degree, 0, 1, 0)
-    glColor3f(0.80, 0.80, 0.90)
 
-    # Base column
+    now = time.perf_counter()
+    pulse = 0.5 + 0.5 * math.sin(now * 3.2 + (t.x * 0.3 + t.z * 0.2)) 
+    bob   = 0.05 * math.sin(now * 2.1 + (t.x - t.z) * 0.25)
+    spin  = (now * 60.0) % 360.0
+
+    col_base   = (0.75, 0.85, 1.00)  
+    col_barrel = (0.80, 0.65, 1.00)  
+    col_core   = (0.55, 0.90, 1.00)  
+    col_halo   = (0.65, 0.85, 1.00)  
+
     glPushMatrix()
     glTranslatef(0.0, 0.5, 0.0)
     glRotatef(-90, 1, 0, 0)
-    gluCylinder(quadric, 0.25, 0.25, 1.0, 12, 1)
+    glColor3f(*col_base)
+
+    gluCylinder(quadric, 0.25, 0.25, 1.0, 18, 1)
     glPopMatrix()
 
-    # Barrel
-    glColor3f(0.95, 0.40, 0.30)
     glPushMatrix()
     glTranslatef(0.0, 1.1, 0.0)
     glRotatef(-90, 1, 0, 0)
-    gluCylinder(quadric, 0.1, 0.1, 0.6, 10, 1)
+    glColor3f(*col_barrel)
+    gluCylinder(quadric, 0.1, 0.1, 0.6, 16, 1)
+    glPopMatrix()
+
+    glPushMatrix()
+    glTranslatef(0.0, 0.9 + bob*0.5, 0.0)
+    glColor3f(0.70, 0.85, 1.00)
+    glScalef(0.18 + 0.02 * pulse, 0.55 + 0.10 * pulse, 0.18 + 0.02 * pulse)
+    glutSolidCube(1.0)
+    glPopMatrix()
+
+    glPushMatrix()
+    glTranslatef(0.0, 1.25 + bob, 0.0)
+    glColor3f(*col_core)
+    core_r = 0.20 + 0.03 * pulse
+    gluSphere(quadric, core_r, sphere_slices, sphere_stacks)
+    glPopMatrix()
+
+    ring_y = 1.25 + bob
+    ring_r = 0.65
+    ring_n = 12
+    angle_step = 360.0 / ring_n
+    spin = (now * 60.0) % 360.0 
+
+    glPushMatrix()
+
+    glRotatef(-t.rotate_degree, 0, 1, 0)
+
+    glTranslatef(0.0, ring_y, 0.0)
+    glRotatef(spin, 0, 1, 0)
+
+    for i in range(ring_n):
+        wobble = 0.01 * math.sin(now * 4.0 + i)
+        glPushMatrix()
+
+        glRotatef(angle_step * i, 0, 1, 0)
+        glTranslatef(0.0, wobble, ring_r)
+        glColor3f(0.65, 0.85, 1.00)
+        glScalef(0.14, 0.06, 0.28)
+        glutSolidCube(1.0)
+
+        glPopMatrix()
+
     glPopMatrix()
 
     ratio = clamp(t.hp_vis / t.max_hp, 0.0, 1.0)
     bar_w = HPBAR_WIDTH
     bar_d = HPBAR_DEPTH
     bar_h = HPBAR_HEIGHT
-    y = HPBAR_Y
+    y     = HPBAR_Y
 
     glPushMatrix()
 
     glRotatef(-t.rotate_degree, 0, 1, 0)
     glTranslatef(0.0, y, 0.0)
 
-
     glPushMatrix()
+
     glColor3f(0.55, 0.08, 0.08)
-    glTranslatef(0.0, bar_h * 0.5, 0.0)  
+    glTranslatef(0.0, bar_h * 0.5, 0.0)
     glScalef(bar_w, bar_h, bar_d)
     glutSolidCube(1.0)
+
     glPopMatrix()
 
     inner_h = max(0.02, bar_h - 2 * HPBAR_MARGIN)
@@ -1296,16 +1347,18 @@ def draw_tower(t, quadric):
     inner_w = max(0.02, (bar_w - 2 * HPBAR_MARGIN) * ratio)
 
     glPushMatrix()
+
     glColor3f(0.12, 0.85, 0.18)
-    left_x = -bar_w * 0.5 + HPBAR_MARGIN  
+    left_x = -bar_w * 0.5 + HPBAR_MARGIN
     glTranslatef(left_x + inner_w * 0.5, HPBAR_MARGIN + inner_h * 0.5, 0.0)
     glScalef(inner_w, inner_h, inner_d)
     glutSolidCube(1.0)
+
     glPopMatrix()
 
     glPopMatrix()
     glPopMatrix()
-    
+
 def draw_enemy(e, quadric):
     glPushMatrix()
 
