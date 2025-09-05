@@ -21,7 +21,8 @@ from OpenGL.GLUT import (
 )
 
 # CONSTRAINTS AND CONFIGS
-WIDTH, HEIGHT = 1000, 700
+WIDTH = 1000
+HEIGHT = 700
 ground_y = 0.0
 
 # boss
@@ -62,7 +63,7 @@ meteor_aoe_radius = 9999.0
 sphere_slices = 18
 sphere_stacks = 14
 
-# ski
+# sky
 sky_wall_extent = 120.0
 sky_wall_height = 60.0
 sky_color = (0.70, 0.88, 1.00)
@@ -79,8 +80,8 @@ class MapPreset:
 
 DEFAULT_MAP = MapPreset(
     name = "Default",
-    path_points = [(-8.0, -6.0),(-8.0, -2.0),(-4.0, -2.0),(0.0, -2.0),(0.0, 2.0),(5.0, 2.0),(8.0, 2.0)],
-    tower_slots = [(-9.5, -4.0),(-6.0, -3.5),(-2.5, -3.0),(1.5, -3.0),(1.5, 3.0),(4.0, 3.0),(7.0, 3.0)],
+    path_points = [(-8.0, -6.0), (-8.0, -2.0), (-4.0, -2.0), (0.0, -2.0), (0.0, 2.0), (5.0, 2.0), (8.0, 2.0)],
+    tower_slots = [(-9.5, -4.0), (-6.0, -3.5), (-2.5, -3.0), (1.5, -3.0), (1.5, 3.0), (4.0, 3.0), (7.0, 3.0)],
     path_width = 1.2,
     ground_scale = (30.0, 1.0, 20.0),
     camera_distance = 16.0
@@ -89,14 +90,14 @@ DEFAULT_MAP = MapPreset(
 Mohammadpur = MapPreset(
     name = "Mohammadpur",
     path_points = [(-28.0, -18.0), (-28.0, -10.0), (-16.0, -10.0), (-16.0, -16.0), (-4.0, -16.0),
-                 (-4.0, -6.0), (8.0, -6.0), (8.0, 6.0), (-12.0, 6.0), (-12.0, 14.0), (-2.0, 14.0),
-                 (-2.0 ,2.0),(14.0, 2.0),(14.0, -8.0),(24.0, -8.0),(24.0, 12.0),(6.0, 12.0),
-                 (6.0, 18.0),(28.0, 18.0)],
-    tower_slots = [(-29.5,-14.0),(-20.0,-10.0),(-6.0,-16.0),(8.0,-1.0),(0.0,6.0),(-12.0,10.0),
-                 (4.0,14.0),(14.0,-3.0),(24.0,5.0),(7.5,18.0)],
-    path_width=1.6,
-    ground_scale=(60.0,1.0,40.0),
-    camera_distance=34.0
+                   (-4.0, -6.0), (8.0, -6.0), (8.0, 6.0), (-12.0, 6.0), (-12.0, 14.0), (-2.0, 14.0),
+                   (-2.0, 2.0), (14.0, 2.0), (14.0, -8.0), (24.0, -8.0), (24.0, 12.0), (6.0, 12.0),
+                   (6.0, 18.0), (28.0, 18.0)],
+    tower_slots = [(-29.5, -14.0), (-20.0, -10.0), (-6.0, -16.0), (8.0, -1.0), (0.0, 6.0), (-12.0, 10.0),
+                   (4.0, 14.0), (14.0, -3.0), (24.0, 5.0), (7.5, 18.0)],
+    path_width = 1.6,
+    ground_scale = (60.0, 1.0, 40.0),
+    camera_distance = 34.0
 )
 
 MAPS = {"Default": DEFAULT_MAP, "Mohammadpur": Mohammadpur}
@@ -104,34 +105,42 @@ SELECTED_MAP = "Mohammadpur"
 
 # math helpers
 def dist2D(ax, az, bx, bz):
-    return math.hypot(bx-ax, bz-az)
+    return math.hypot(bx - ax, bz - az)
 
 def normalize2D(dx, dz):
     mag = math.hypot(dx, dz)
-    if mag <= 1e-6: return (0.0, 0.0)
-    return (dx/mag, dz/mag)
+    if mag <= 1e-6:
+        return (0.0, 0.0)
+    return (dx / mag, dz / mag)
 
 def clamp(value, lo, hi):
     return max(lo, min(hi, value))
 
 # enemy
 class Enemy:
-    def __init__(self, x, z, speed, health, is_boss=False):
-        self.x = x; self.z = z; self.y = ground_y + enemy_radius
+    def __init__(self, x, z, speed, health, is_boss = False):
+        self.x = x
+        self.z = z
+        self.y = ground_y + enemy_radius
         self.speed = speed
         self.health = health
         self.is_boss = is_boss
         self.radius = (boss_radius if is_boss else enemy_radius)
         self.path_idx = 0
         self.alive = True
+
     def is_dead(self):
         return self.health <= 0 or not self.alive
 
 # projectile
 class Projectile:
-    def __init__(self, x, y, z, dir_x, dir_y, dir_z, speed, damage, explosive=False):
-        self.x = x; self.y = y; self.z = z
-        self.dx = dir_x; self.dy = dir_y; self.dz = dir_z
+    def __init__(self, x, y, z, dir_x, dir_y, dir_z, speed, damage, explosive = False):
+        self.x = x
+        self.y = y
+        self.z = z
+        self.dx = dir_x
+        self.dy = dir_y
+        self.dz = dir_z
         self.speed = speed
         self.damage = damage
         self.radius = bullet_radius
@@ -144,7 +153,9 @@ class Projectile:
 # tower
 class Tower:
     def __init__(self, x, z):
-        self.x = x; self.z = z; self.y = ground_y
+        self.x = x
+        self.z = z
+        self.y = ground_y
         self.range = tower_default_radius
         self.base_fire_interval = tower_firerate
         self.cooldown = 0.0
@@ -152,6 +163,7 @@ class Tower:
         self.projectile_speed = bullet_speed
         self.yaw_deg = 0.0
         self.active = True
+
     def effective_interval(self, cheats):
         interval = self.base_fire_interval
         if cheats.fast_attack_active:
@@ -161,7 +173,8 @@ class Tower:
 # tower slot
 class TowerSlot:
     def __init__(self, x, z):
-        self.x = x; self.z = z
+        self.x = x
+        self.z = z
         self.occupied = False
         self.tower = None
 
@@ -180,6 +193,7 @@ class Cheats:
         self.explosive_active = False
         self.explosive_ends_at = 0.0
         self.meteors = []
+
     def update(self, now):
         if self.fast_attack_active and now >= self.fast_attack_ends_at:
             self.fast_attack_active = False
@@ -189,18 +203,20 @@ class Cheats:
 # meteor
 class Meteor:
     def __init__(self, target_x, target_z):
-        self.x = target_x; self.z = target_z
+        self.x = target_x
+        self.z = target_z
         self.y = 10.0
         self.vy = -meteor_fall_speed
         self.radius = meteor_radius
         self.aoe = meteor_aoe_radius
         self.damage = 99999999
         self.alive = True
+
     def update(self, dt):
         self.y += self.vy * dt
         if self.y <= ground_y + self.radius:
             self.y = ground_y + self.radius
-            self.alive = False  # triggers board wipe in update_meteors
+            self.alive = False
 
 # waves
 class WaveManager:
@@ -212,6 +228,7 @@ class WaveManager:
         self.between_waves = 4.0
         self.resting = False
         self.boss_spawned = False
+
     def update(self, dt, game):
         if self.resting:
             self.time_to_next -= dt
@@ -222,17 +239,20 @@ class WaveManager:
                 self.spawn_interval = max(0.4, 1.2 - 0.05 * self.wave_num)
                 self.time_to_next = self.spawn_interval
             return
+
         if self.to_spawn > 0:
             self.time_to_next -= dt
             if self.time_to_next <= 0:
                 self.time_to_next = self.spawn_interval
                 self.to_spawn -= 1
-                spawn_enemy(game, speed=1.2 + 0.05*self.wave_num, health=60 + 10*self.wave_num)
+                spawn_enemy(game, speed = 1.2 + 0.05 * self.wave_num, health = 60 + 10 * self.wave_num)
             return
+
         if not self.boss_spawned:
             self.boss_spawned = True
             spawn_boss(game)
             return
+
         if not any(e.alive for e in game.enemies):
             self.resting = True
             self.wave_num += 1
@@ -245,6 +265,7 @@ class Camera:
         self.distance = 16.0
         self.yaw = 35.0
         self.pitch = 35.0
+
     def eye(self):
         yaw_r = math.radians(self.yaw)
         pitch_r = math.radians(self.pitch)
@@ -272,45 +293,50 @@ class GameState:
 # spawn
 def spawn_enemy(game, speed, health):
     x0, z0 = game.map.path_points[0]
-    game.enemies.append(Enemy(x0, z0, speed, health, is_boss=False))
+    game.enemies.append(Enemy(x0, z0, speed, health, is_boss = False))
 
 def spawn_boss(game):
     x0, z0 = game.map.path_points[0]
     hp = boss_base_hp + (game.wave.wave_num - 1) * boss_hp_wave_scale
-    game.enemies.append(Enemy(x0, z0, boss_speed, hp, is_boss=True))
+    game.enemies.append(Enemy(x0, z0, boss_speed, hp, is_boss = True))
 
 # actions
 def build_tower_at_slot(game, slot_idx):
-    if slot_idx < 0 or slot_idx >= len(game.tower_slots): return False
+    if slot_idx < 0 or slot_idx >= len(game.tower_slots):
+        return False
     slot = game.tower_slots[slot_idx]
-    if slot.occupied or game.player.money < tower_cost: return False
+    if slot.occupied or game.player.money < tower_cost:
+        return False
     slot.occupied = True
     slot.tower = Tower(slot.x, slot.z)
     game.player.money -= tower_cost
     return True
 
 def activate_fast_attack(game, now):
-    if game.player.money < cheatcost_fast: return False
+    if game.player.money < cheatcost_fast:
+        return False
     game.player.money -= cheatcost_fast
     game.cheats.fast_attack_active = True
     game.cheats.fast_attack_ends_at = now + cheat_fast_duration
     return True
 
 def activate_explosive(game, now):
-    if game.player.money < cheatcose_explosive: return False
+    if game.player.money < cheatcose_explosive:
+        return False
     game.player.money -= cheatcose_explosive
     game.cheats.explosive_active = True
     game.cheats.explosive_ends_at = now + cheat_explosive_duration
     return True
 
 def activate_meteor(game):
-    if game.player.money < cheatcose_meteor: return False
+    if game.player.money < cheatcose_meteor:
+        return False
     game.player.money -= cheatcose_meteor
     if game.enemies:
         tx = sum(e.x for e in game.enemies) / len(game.enemies)
         tz = sum(e.z for e in game.enemies) / len(game.enemies)
     else:
-        mid = len(game.map.path_points)//2
+        mid = len(game.map.path_points) // 2
         tx, tz = game.map.path_points[mid]
     game.cheats.meteors.append(Meteor(tx, tz))
     return True
@@ -330,7 +356,8 @@ def update_enemies(game, dt):
     base_x, base_z = path[-1]
     survivors = []
     for e in game.enemies:
-        if not e.alive: continue
+        if not e.alive:
+            continue
         if e.path_idx < len(path) - 1:
             tx, tz = path[e.path_idx + 1]
             ndx, ndz = normalize2D(tx - e.x, tz - e.z)
@@ -346,17 +373,21 @@ def update_enemies(game, dt):
     game.enemies = survivors
 
 def acquire_target(tower, enemies):
-    best = None; best_d = 1e9
+    best = None
+    best_d = 1e9
     for e in enemies:
-        if not e.alive: continue
+        if not e.alive:
+            continue
         d = dist2D(tower.x, tower.z, e.x, e.z)
         if d <= tower.range and d < best_d:
-            best = e; best_d = d
+            best = e
+            best_d = d
     return best
 
 def update_towers(game, dt):
     for slot in game.tower_slots:
-        if not slot.occupied or not slot.tower.active: continue
+        if not slot.occupied or not slot.tower.active:
+            continue
         t = slot.tower
         t.cooldown -= dt
         target = acquire_target(t, game.enemies)
@@ -368,33 +399,38 @@ def update_towers(game, dt):
                 dir_x, dir_z = normalize2D(dx, dz)
                 dir_y = 0.1
                 proj = Projectile(
-                    x=t.x, y=t.y + 1.0, z=t.z,
-                    dir_x=dir_x, dir_y=dir_y, dir_z=dir_z,
-                    speed=t.projectile_speed,
-                    damage=t.damage,
-                    explosive=game.cheats.explosive_active
+                    x = t.x, y = t.y + 1.0, z = t.z,
+                    dir_x = dir_x, dir_y = dir_y, dir_z = dir_z,
+                    speed = t.projectile_speed,
+                    damage = t.damage,
+                    explosive = game.cheats.explosive_active
                 )
                 game.projectiles.append(proj)
 
 def update_projectiles(game, dt):
     alive_proj = []
     for p in game.projectiles:
-        if not p.alive: continue
+        if not p.alive:
+            continue
         p.x += p.dx * p.speed * dt
         p.y += p.dy * p.speed * dt
         p.z += p.dz * p.speed * dt
         p.lifetime += dt
         if p.lifetime > p.max_lifetime or abs(p.x) > 80 or abs(p.z) > 80 or p.y < ground_y - 1:
-            p.alive = False; continue
+            p.alive = False
+            continue
         hit_enemy = None
         for e in game.enemies:
-            if not e.alive: continue
+            if not e.alive:
+                continue
             if dist2D(p.x, p.z, e.x, e.z) <= (p.radius + e.radius):
-                hit_enemy = e; break
+                hit_enemy = e
+                break
         if hit_enemy:
             if p.explosive:
                 for e in game.enemies:
-                    if not e.alive: continue
+                    if not e.alive:
+                        continue
                     if dist2D(p.x, p.z, e.x, e.z) <= p.explosion_radius:
                         e.health -= p.damage
                         if e.health <= 0 and e.alive:
@@ -422,7 +458,8 @@ def update_meteors(game, dt):
                 continue
             # impact: wipe the board; boss loses 50% of remaining HP
             for e in game.enemies:
-                if not e.alive: continue
+                if not e.alive:
+                    continue
                 if e.is_boss:
                     e.health *= 0.5
                     if e.health <= 0:
@@ -437,27 +474,34 @@ def update_meteors(game, dt):
 
 # ui text
 def draw_text_2d(x, y, s):
-    glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity()
+    glMatrixMode(GL_PROJECTION)
+    glPushMatrix()
+    glLoadIdentity()
     gluOrtho2D(0, WIDTH, 0, HEIGHT)
-    glMatrixMode(GL_MODELVIEW); glPushMatrix(); glLoadIdentity()
+    glMatrixMode(GL_MODELVIEW)
+    glPushMatrix()
+    glLoadIdentity()
     glRasterPos2f(x, y)
     for ch in s:
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(ch))
-    glMatrixMode(GL_MODELVIEW); glPopMatrix()
-    glMatrixMode(GL_PROJECTION); glPopMatrix()
+    glMatrixMode(GL_MODELVIEW)
+    glPopMatrix()
+    glMatrixMode(GL_PROJECTION)
+    glPopMatrix()
 
 # sky
 def draw_sky_walls():
     sx, _, sz = G.map.ground_scale
-    x = sx * 0.5 + 50.0   
-    z = sz * 0.5 + 50.0 
+    x = sx * 0.5 + 50.0
+    z = sz * 0.5 + 50.0
 
-    y_bottom = -100.0  
+    y_bottom = -100.0
     y_top = sky_wall_height
 
     r, g, b = sky_color
     glColor3f(r, g, b)
 
+    # +Z wall
     glBegin(GL_QUADS)
     glVertex3f(-x, y_bottom,  z)
     glVertex3f( x, y_bottom,  z)
@@ -465,13 +509,15 @@ def draw_sky_walls():
     glVertex3f(-x, y_top,     z)
     glEnd()
 
+    # floor (bottom)
     glBegin(GL_QUADS)
-    glVertex3f(-x, y_bottom,  z)  
-    glVertex3f( x, y_bottom,  z)  
-    glVertex3f( x, y_bottom, -z) 
-    glVertex3f(-x, y_bottom, -z) 
+    glVertex3f(-x, y_bottom,  z)
+    glVertex3f( x, y_bottom,  z)
+    glVertex3f( x, y_bottom, -z)
+    glVertex3f(-x, y_bottom, -z)
     glEnd()
 
+    # -Z wall
     glBegin(GL_QUADS)
     glVertex3f( x, y_bottom, -z)
     glVertex3f(-x, y_bottom, -z)
@@ -479,6 +525,7 @@ def draw_sky_walls():
     glVertex3f( x, y_top,   -z)
     glEnd()
 
+    # +X wall
     glBegin(GL_QUADS)
     glVertex3f( x, y_bottom, -z)
     glVertex3f( x, y_bottom,  z)
@@ -486,6 +533,7 @@ def draw_sky_walls():
     glVertex3f( x, y_top,    -z)
     glEnd()
 
+    # -X wall
     glBegin(GL_QUADS)
     glVertex3f(-x, y_bottom,  z)
     glVertex3f(-x, y_bottom, -z)
@@ -508,17 +556,18 @@ def draw_path():
     glColor3f(0.85, 0.80, 0.70)
     pts = G.map.path_points
     width = G.map.path_width
-    for i in range(len(pts)-1):
-        x0,z0 = pts[i]; x1,z1 = pts[i+1]
-        dx,dz = (x1-x0),(z1-z0)
-        nx,nz = normalize2D(-dz, dx)
-        wx,wz = nx*width*0.5, nz*width*0.5
+    for i in range(len(pts) - 1):
+        x0, z0 = pts[i]
+        x1, z1 = pts[i + 1]
+        dx, dz = (x1 - x0), (z1 - z0)
+        nx, nz = normalize2D(-dz, dx)
+        wx, wz = nx * width * 0.5, nz * width * 0.5
         y = ground_y + 0.01
         glBegin(GL_QUADS)
-        glVertex3f(x0-wx, y, z0-wz)
-        glVertex3f(x0+wx, y, z0+wz)
-        glVertex3f(x1+wx, y, z1+wz)
-        glVertex3f(x1-wx, y, z1-wz)
+        glVertex3f(x0 - wx, y, z0 - wz)
+        glVertex3f(x0 + wx, y, z0 + wz)
+        glVertex3f(x1 + wx, y, z1 + wz)
+        glVertex3f(x1 - wx, y, z1 - wz)
         glEnd()
 
 # base
@@ -563,8 +612,10 @@ def draw_tower(t, quadric):
 def draw_enemy(e, quadric):
     glPushMatrix()
     glTranslatef(e.x, e.y, e.z)
-    if e.is_boss: glColor3f(0.6, 0.1, 0.9)
-    else:         glColor3f(0.2, 0.7, 0.9)
+    if e.is_boss:
+        glColor3f(0.6, 0.1, 0.9)
+    else:
+        glColor3f(0.2, 0.7, 0.9)
     gluSphere(quadric, e.radius, sphere_slices, sphere_stacks)
     glPopMatrix()
 
@@ -572,7 +623,7 @@ def draw_enemy(e, quadric):
 def draw_projectile(p, quadric):
     glPushMatrix()
     glTranslatef(p.x, p.y, p.z)
-    glColor3f(1.0, 0.6, 0.0 if p.explosive else 1.0)  # orange if explosive, yellow otherwise
+    glColor3f(1.0, 0.6, 0.0 if p.explosive else 1.0)
     gluSphere(quadric, p.radius, 10, 10)
     glPopMatrix()
 
@@ -584,18 +635,22 @@ def draw_meteor(m, quadric):
     gluSphere(quadric, m.radius, 14, 10)
     glPopMatrix()
 
-# (optional) range debug
+# range debug
 def draw_ranges_debug(game):
     glColor3f(0.1, 0.7, 0.1)
     segments = 32
     for slot in game.tower_slots:
-        if not slot.occupied: continue
-        t = slot.tower; r = t.range
+        if not slot.occupied:
+            continue
+        t = slot.tower
+        r = t.range
         for i in range(segments):
-            ang0 = 2*math.pi*(i/segments)
-            ang1 = 2*math.pi*((i+1)/segments)
-            x0 = t.x + r*math.cos(ang0); z0 = t.z + r*math.sin(ang0)
-            x1 = t.x + r*math.cos(ang1); z1 = t.z + r*math.sin(ang1)
+            ang0 = 2 * math.pi * (i / segments)
+            ang1 = 2 * math.pi * ((i + 1) / segments)
+            x0 = t.x + r * math.cos(ang0)
+            z0 = t.z + r * math.sin(ang0)
+            x1 = t.x + r * math.cos(ang1)
+            z1 = t.z + r * math.sin(ang1)
             glBegin(GL_LINES)
             glVertex3f(x0, ground_y + 0.02, z0)
             glVertex3f(x1, ground_y + 0.02, z1)
@@ -609,17 +664,17 @@ def display():
     glViewport(0, 0, WIDTH, HEIGHT)
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-    glMatrixMode(GL_PROJECTION); glLoadIdentity()
-    gluPerspective(60.0, WIDTH/float(HEIGHT), 0.1, 300.0)  # far plane extended
-    glMatrixMode(GL_MODELVIEW); glLoadIdentity()
+    glMatrixMode(GL_PROJECTION)
+    glLoadIdentity()
+    gluPerspective(60.0, WIDTH / float(HEIGHT), 0.1, 300.0)
+    glMatrixMode(GL_MODELVIEW)
+    glLoadIdentity()
 
     ex, ey, ez = G.camera.eye()
     gluLookAt(ex, ey, ez, G.camera.target_x, G.camera.target_y, G.camera.target_z, 0, 1, 0)
 
-    # bright background walls
-    draw_sky_walls()
-
     # world
+    draw_sky_walls()
     draw_ground()
     draw_path()
     draw_base()
@@ -655,24 +710,33 @@ def idle():
 def keyboard(key, x, y):
     k = key.decode('utf-8').lower()
     now = time.perf_counter()
-    if k == 'p': G.paused = not G.paused
+    if k == 'p':
+        G.paused = not G.paused
     elif k in '1234567890':
         idx = 9 if k == '0' else (ord(k) - ord('1'))
         build_tower_at_slot(G, idx)
-    elif k == 'f': activate_fast_attack(G, now)
-    elif k == 'e': activate_explosive(G, now)
-    elif k == 'm': activate_meteor(G)
+    elif k == 'f':
+        activate_fast_attack(G, now)
+    elif k == 'e':
+        activate_explosive(G, now)
+    elif k == 'm':
+        activate_meteor(G)
     elif k == 'q':
-        import sys; sys.exit(0)
+        import sys
+        sys.exit(0)
 
 def special(key, x, y):
-    if key == GLUT_KEY_LEFT:  G.camera.yaw -= 3
-    if key == GLUT_KEY_RIGHT: G.camera.yaw += 3
-    if key == GLUT_KEY_UP:    G.camera.pitch = clamp(G.camera.pitch + 2, 10, 80)
-    if key == GLUT_KEY_DOWN:  G.camera.pitch = clamp(G.camera.pitch - 2, 10, 80)
+    if key == GLUT_KEY_LEFT:
+        G.camera.yaw -= 3
+    if key == GLUT_KEY_RIGHT:
+        G.camera.yaw += 3
+    if key == GLUT_KEY_UP:
+        G.camera.pitch = clamp(G.camera.pitch + 2, 10, 80)
+    if key == GLUT_KEY_DOWN:
+        G.camera.pitch = clamp(G.camera.pitch - 2, 10, 80)
 
 def mouse(button, state, x, y):
-    # no mouse picking per assignment; keyboard builds only
+    # no mouse picking per assignment
     pass
 
 # init
