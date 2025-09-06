@@ -62,6 +62,15 @@ ability_explosive_duration = 10.0
 ability_fast_multiplier = 2.0
 megaknight_duration = 20.0
 
+# Wind Push and Slow
+wind_ability_cost = 150
+wind_push_force = 8.0
+wind_slow_factor = 0.05
+wind_slow_duration = 5.0
+wind_radius = 12.0
+wind_cooldown = 5.0
+
+
 # Meteor 
 meteor_fall_speed = 14.0
 meteor_radius = 2.5
@@ -96,6 +105,7 @@ HPBAR_SMOOTH_RATE = 0.10
 HPBAR_LAG_SEC = 0.25  
 
 TOWER_DECAY_RATE = 1.0
+
 
 class MapPreset:
     def __init__(self, name, path_points, tower_slots, path_width, ground_scale, camera_distance):
@@ -254,9 +264,22 @@ class Enemy:
         self.radius = (boss_radius if is_boss else enemy_radius)
         self.path_idx = 0
         self.alive = True
+        self.wind_affected = False
+        self.wind_slow_end_time = 0.0
+        self.original_speed = speed
 
     def is_dead(self):
         return self.health <= 0 or not self.alive
+    
+    def apply_wind_effect(self, game_time, slow_duration):
+        self.wind_affected = True
+        self.wind_slow_end_time = game_time + slow_duration
+        self.speed = self.original_speed * wind_slow_factor
+
+    def update_wind_effect(self, game_time):
+        if self.wind_affected and game_time >= self.wind_slow_end_time:
+            self.wind_affected = False
+            self.speed = self.original_speed
     
 def enemy_velocity(e, path):
     nxt_idx = min(e.path_idx + 1, len(path) - 1)
@@ -294,6 +317,9 @@ def lead_direction(shooter_x, shooter_z, target_x, target_z, vtx, vtz, proj_spee
     aim_x = rx + vtx * t
     aim_z = rz + vtz * t
     return normalize2D(aim_x, aim_z)
+
+
+        
 
 class Projectile:
     def __init__(self, x, y, z, dir_x, dir_y, dir_z, speed, damage, explosive = False, fast = False):
@@ -425,10 +451,18 @@ class MegaKnight:
         self.exit_charge_duration = 1.5
         self.exit_charge_timer = 0.0
         self.exit_jump_duration = 2.5
+        
+        self.wind_cooldown_timer = 0.0
+        self.wind_max_cooldown = wind_cooldown
+        self.can_use_wind = True
 
     def update(self, dt):
         if self.state == 'INACTIVE':
             return
+        if self.wind_cooldown_timer > 0:
+            self.wind_cooldown_timer -= dt
+            if self.wind_cooldown_timer <= 0:
+                self.can_use_wind = True
 
         if self.state == 'FIGHTING':
             self.timer -= dt
@@ -744,6 +778,90 @@ class MegaKnight:
         
         glPopMatrix()
         glPopMatrix()
+        
+        
+    def use_wind_ability(self, game_time):
+        if not self.can_use_wind or self.wind_cooldown_timer > 0:
+            return False
+        
+        if G.player.money < wind_ability_cost:
+            return False
+        
+        G.player.money -= wind_ability_cost
+        
+        affected_enemies = []
+        for enemy in G.enemies:
+            if enemy.alive:
+                distance = dist2D(self.x, self.z, enemy.x, enemy.z)
+                if distance <= wind_radius:
+                    affected_enemies.append((enemy, distance))
+        
+        for enemy, distance in affected_enemies:
+            push_dx = enemy.x - self.x
+            push_dz = enemy.z - self.z
+            push_ndx, push_ndz = normalize2D(push_dx, push_dz)
+            
+            force_multiplier = max(0.2, (wind_radius - distance) / wind_radius)
+            actual_push = wind_push_force * force_multiplier
+            
+            self.push_enemy_back(enemy, push_ndx * actual_push, push_ndz * actual_push)
+            
+            enemy.apply_wind_effect(game_time, wind_slow_duration)
+       
+        self.wind_cooldown_timer = self.wind_max_cooldown
+        self.can_use_wind = False
+        
+        G.shake_timer = 0.8
+        G.shake_mag = 0.4
+        
+        return True
+
+    def push_enemy_back(self, enemy, push_x, push_z):
+        new_x = enemy.x + push_x
+        new_z = enemy.z + push_z
+        
+        if hasattr(G, 'map') and G.map and G.map.path_points:
+            path = G.map.path_points
+            
+            min_dist_to_path = float('inf')
+            closest_segment = 0
+            
+            for i in range(len(path) - 1):
+                seg_dist = self.point_to_segment_distance(new_x, new_z, 
+                                                        path[i][0], path[i][1], 
+                                                        path[i+1][0], path[i+1][1])
+                if seg_dist < min_dist_to_path:
+                    min_dist_to_path = seg_dist
+                    closest_segment = i
+            if min_dist_to_path <= G.map.path_width * 2:
+                enemy.x = new_x
+                enemy.z = new_z
+                current_dist_to_start = dist2D(enemy.x, enemy.z, path[0][0], path[0][1])
+                for i in range(len(path) - 1):
+                    point_dist = dist2D(enemy.x, enemy.z, path[i][0], path[i][1])
+                    next_point_dist = dist2D(enemy.x, enemy.z, path[i+1][0], path[i+1][1])
+                    
+                    if point_dist <= next_point_dist:
+                        enemy.path_idx = max(0, i)
+                        break
+
+    def point_to_segment_distance(self, px, pz, ax, az, bx, bz):
+        abx = bx - ax
+        abz = bz - az
+        
+        apx = px - ax
+        apz = pz - az
+        
+        ab_length_sq = abx * abx + abz * abz
+        if ab_length_sq == 0:
+            return dist2D(px, pz, ax, az)
+        
+        t = max(0, min(1, (apx * abx + apz * abz) / ab_length_sq))
+        closest_x = ax + t * abx
+        closest_z = az + t * abz
+        
+        return dist2D(px, pz, closest_x, closest_z)
+
 
 def apply_screen_shake():
     if G.shake_timer <= 0.0:
@@ -992,6 +1110,10 @@ def update_game(game, dt):
         game.shake_timer = max(0.0, game.shake_timer - dt)
 
 def update_enemies(game, dt):
+    now = time.perf_counter()
+    for e in game.enemies:
+        if e.alive:
+            e.update_wind_effect(now)
     path = game.map.path_points
     base_coords = path[-1]
     base_x = base_coords[0]
@@ -1022,6 +1144,11 @@ def update_enemies(game, dt):
             survivors.append(e)
 
     game.enemies = survivors
+    
+def update_enemy_wind_effects(game_time):
+    for enemy in G.enemies:
+        if enemy.alive:
+            enemy.update_wind_effect(game_time)
 
 def acquire_target(tower, enemies):
     return min((e for e in enemies if e.alive), key=lambda e: dist2D(tower.x, tower.z, e.x, e.z), default=None)
@@ -1521,12 +1648,14 @@ def draw_game_world():
     active_slots_count = sum(1 for s in G.tower_slots if s.occupied and s.tower and s.tower.active)
     repair_cost = max(0.0, active_slots_count * float(tower_cost) - 100.0)
     draw_text_2d(10, HEIGHT - 48, f"[P] Pause | [1-0] Build | F: FireRate+ {abilitycost_fast} | E: Explosive {abilitycost_explosive}")
-    draw_text_2d(10, HEIGHT - 96, f"M: Meteor {abilitycost_meteor} | G: MegaKnight {abilitycost_mega_knight} | R: Repair {int(repair_cost)} | Arrows: Camera")
+    draw_text_2d(10, HEIGHT - 96, f"M: Meteor {abilitycost_meteor} | G: MegaKnight {abilitycost_mega_knight} | W: Wind {wind_ability_cost} | R: Repair {int(repair_cost)} | Arrows: Camera")
 
     mk = G.abilities.mega_knight
     if mk and mk.alive:
         info = ""
-        if mk.state == 'FIGHTING': info = f"MK Active: {mk.timer:.1f}s remaining"
+        if mk.state == 'FIGHTING': 
+            wind_status = f" | Wind: {'Ready' if mk.can_use_wind else f'{mk.wind_cooldown_timer:.1f}s'}"
+            info = f"MK Active: {mk.timer:.1f}s remaining"
         elif mk.state == 'EXITING_WALK': info = "Mega Knight is walking to the edge..."
         elif mk.state == 'EXITING_CHARGE': info = "Mega Knight is preparing to leave!"
         elif mk.state == 'EXITING_JUMP': info = "Mega Knight is leaving the arena!"
@@ -1574,6 +1703,14 @@ def keyboard(key, x, y):
         elif k == 'm': activate_meteor(G)
         elif k == 'g': G.activate_mega_knight()
         elif k == 'r': activate_repair_all(G)
+        elif k == 'w':
+            if hasattr(G, 'abilities') and G.abilities.mega_knight and G.abilities.mega_knight.alive:
+                if G.abilities.mega_knight.state == 'FIGHTING':
+                    if G.abilities.mega_knight.use_wind_ability(now):
+                        print("Mega Knight used Wind Ability!")
+                    else:
+                        print("Wind ability on cooldown!")
+
 
     elif G.game_state == 'PAUSED':
         if k == 'p':
