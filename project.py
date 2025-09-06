@@ -35,7 +35,7 @@ ground_y = 0.0
 boss_base_hp = 1000
 boss_hp_wave_scale = 90
 boss_speed = 1.2
-boss_radius = 0.9
+boss_radius = 1.8
 boss_reward = 120
 
 # Enemy Tower Bullet Stats
@@ -259,12 +259,16 @@ class Enemy:
     def __init__(self, x, z, speed, health, is_boss = False):
         self.x = x
         self.z = z
-        self.y = ground_y + enemy_radius
+
         self.speed = speed
         self.health = health
         self.is_boss = is_boss
+
         self.radius = (boss_radius if is_boss else enemy_radius)
+
+        self.y = ground_y + self.radius 
         self.path_idx = 0
+
         self.alive = True
         self.wind_affected = False
         self.wind_slow_end_time = 0.0
@@ -278,8 +282,8 @@ class Enemy:
         self.wind_affected = True
         self.wind_slow_end_time = game_time + slow_duration
         self.speed = self.original_speed * wind_slow_factor
-        # Add logic for enemies to step back into their paths
-        self.path_idx = max(0, self.path_idx - 1)  # Move the enemy a step back in the path if they are pushed off
+
+        self.path_idx = max(0, self.path_idx - 1) 
 
     def update_wind_effect(self, game_time):
         if self.wind_affected and game_time >= self.wind_slow_end_time:
@@ -842,8 +846,7 @@ class MegaKnight:
             if min_dist_to_path <= G.map.path_width * 2:
                 enemy.x = new_x
                 enemy.z = new_z
-                # current_dist_to_start = dist2D(enemy.x, enemy.z, path[0][0], path[0][1])
-                # Adjust path index so enemy stays on the path
+
                 for i in range(len(path) - 1):
                     point_dist = dist2D(enemy.x, enemy.z, path[i][0], path[i][1])
                     next_point_dist = dist2D(enemy.x, enemy.z, path[i+1][0], path[i+1][1])
@@ -1596,20 +1599,68 @@ def draw_tower(t, quadric):
     glPopMatrix()
 
 def draw_enemy(e, quadric):
-    time_now = time.time()
-    pulse = 0.5 + 0.05 * sin(enemy_pulse_frequency * (time_now + e.phase))
-    radius1 = .7 * pulse
-    radius2 = .5 * pulse
     glPushMatrix()
-    glTranslatef(e.x, radius1, e.z)
-
+    
     if e.is_boss:
-        glColor3f(0.6, 0.1, 0.9)
+        glTranslatef(e.x, e.y, e.z) 
+
+        glColor3f(0.3, 0.0, 0.4) 
+        gluSphere(quadric, e.radius, sphere_slices, sphere_stacks)
+
+        num_spikes = 8
+        spike_length = e.radius * 1.5
+        spike_base_radius = e.radius * 0.15
+        for i in range(num_spikes):
+            glPushMatrix()
+            angle_y = (360.0 / num_spikes) * i
+            angle_x = 45.0 + 15 * sin(time.time() * 2.0 + i)
+            
+            glRotatef(angle_y, 0, 1, 0)
+            glRotatef(angle_x, 1, 0, 0) 
+            
+            glColor3f(0.8, 0.2, 0.8)
+            gluCylinder(quadric, spike_base_radius, 0, spike_length, 8, 1) 
+
+            glPopMatrix()
+            
+        # Top spike
+        glPushMatrix()
+        glRotatef(-90, 1, 0, 0)
+        glColor3f(0.9, 0.4, 0.9)
+        gluCylinder(quadric, spike_base_radius * 1.2, 0, spike_length * 1.2, 8, 1)
+        glPopMatrix()
+
+        # Core
+        time_now = time.time()
+        pulse_scale = 1.0 + 0.15 * sin(enemy_pulse_frequency * (time_now + e.phase))
+        glPushMatrix()
+
+        glTranslatef(0, e.radius * 0.4, 0) 
+        glColor3f(1.0, 0.1, 0.1)
+        glScalef(pulse_scale, pulse_scale, pulse_scale)
+        gluSphere(quadric, e.radius * 0.3, 12, 10)
+
+        glPopMatrix()
+        
     else:
+        time_now = time.time()
+        pulse = 1.0 + 0.05 * sin(enemy_pulse_frequency * (time_now + e.phase))
+        
+        body_radius = e.radius * pulse
+        head_radius = body_radius * 0.7 
+
+        glPushMatrix()
+        
+        glTranslatef(e.x, ground_y + body_radius, e.z)
+
         glColor3f(0.2, 0.7, 0.9)
-    gluSphere(quadric, radius1, 10, 8)
-    glTranslatef(0, radius1 + radius2 * 0.8, 0)
-    gluSphere(quadric, radius2, 10, 8)
+        gluSphere(quadric, body_radius, 10, 8)
+        
+        # Draw head
+        glTranslatef(0, body_radius + head_radius * 0.8, 0)
+        gluSphere(quadric, head_radius, 10, 8)
+        glPopMatrix()
+
     glPopMatrix()
 
 def draw_projectile(p, quadric):
