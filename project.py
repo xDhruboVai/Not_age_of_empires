@@ -883,10 +883,24 @@ def apply_screen_shake():
     glTranslatef(ox, oy, oz)
 
 class Meteor:
-    def __init__(self, x, z):
-        self.x = x
-        self.z = z
-        self.y = 40.0
+    def __init__(self, start_x, start_y, start_z, target_x, target_z):
+        self.x = start_x
+        self.y = start_y
+        self.z = start_z
+        
+        target_y = ground_y + meteor_radius
+        dir_x = target_x - self.x
+        dir_y = target_y - self.y
+        dir_z = target_z - self.z
+        
+        mag = sqrt(dir_x ** 2 + dir_y ** 2 + dir_z ** 2)
+        if mag > 1e-6:
+            self.dx = dir_x / mag
+            self.dy = dir_y / mag
+            self.dz = dir_z / mag
+        else:
+            self.dx, self.dy, self.dz = 0, -1, 0 
+
         self.radius = meteor_radius
         self.speed = meteor_fall_speed
         self.alive = True
@@ -894,11 +908,15 @@ class Meteor:
     def update(self, dt):
         if not self.alive:
             return
-        self.y -= self.speed * dt
-        if self.y <= ground_y + 0.1:
+            
+        self.x += self.dx * self.speed * dt
+        self.y += self.dy * self.speed * dt
+        self.z += self.dz * self.speed * dt
+        
+        if self.y <= ground_y + self.radius:
             self.alive = False
-            G.shake_timer = 1
-            G.shake_mag = 1
+            G.shake_timer = 1.0
+            G.shake_mag = 1.0
 
 class WaveManager:
     def __init__(self):
@@ -1093,15 +1111,28 @@ def activate_meteor(game):
     if game.player.money < abilitycost_meteor:
         return False
     game.player.money -= abilitycost_meteor
+
     if game.enemies:
-        target_enemy = min(game.enemies, key=lambda e: dist2D(e.x, e.z, game.map.path_points[-1][0], game.map.path_points[-1][1]))
-        tx = target_enemy.x
-        tz = target_enemy.z
+        target_enemy = min((e for e in game.enemies if e.alive), 
+                           key = lambda e: dist2D(e.x, e.z, game.map.path_points[-1][0], game.map.path_points[-1][1]),
+                           default = None)
+        if target_enemy:
+            target_x, target_z = target_enemy.x, target_enemy.z
+        else: 
+            path_mid = game.map.path_points[len(game.map.path_points) // 2]
+            target_x, target_z = path_mid
     else:
         path_mid = game.map.path_points[len(game.map.path_points) // 2]
-        tx = path_mid[0]
-        tz = path_mid[1]
-    game.abilities.meteors.append(Meteor(tx, tz))
+        target_x, target_z = path_mid
+
+    start_y = 40.0
+    spawn_radius_xz = 25.0 
+    random_angle = random.uniform(0, 2 * pi)
+    
+    start_x = target_x + cos(random_angle) * spawn_radius_xz
+    start_z = target_z + sin(random_angle) * spawn_radius_xz
+
+    game.abilities.meteors.append(Meteor(start_x, start_y, start_z, target_x, target_z))
     return True
 
 def update_game(game, dt):
