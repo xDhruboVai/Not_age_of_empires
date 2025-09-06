@@ -29,9 +29,9 @@ HEIGHT = 700
 ground_y = 0.0
 
 # Boss Stats
-boss_base_hp = 520
+boss_base_hp = 1000
 boss_hp_wave_scale = 90
-boss_speed = 0.9
+boss_speed = 1.2
 boss_radius = 0.9
 boss_reward = 120
 
@@ -58,7 +58,7 @@ abilitycost_meteor = 450
 abilitycost_mega_knight = 650
 ability_fast_duration = 10.0
 ability_explosive_duration = 10.0
-ability_fast_multiplier = 2.0
+ability_fast_multiplier = 5.0
 megaknight_duration = 1
 
 # Wind Push and Slow
@@ -141,7 +141,7 @@ Mohammadpur = MapPreset(
 Male_Fantasy = MapPreset(
     name = "Male Fantasy",
     path_points = [
-        (-22.0, -16.0), (-16.0, -12.0), (-12.0, -8.0), (-8.0, -6.0),
+        (-8.0, -6.0),
         (-6.0, -4.0), (-5.0, -2.0), (-5.0,  0.0),
         (-4.0,  3.0), (-1.0,  5.0), ( 3.0,  4.0), ( 5.0,  0.0),
         ( 3.0, -4.0), (-1.0, -5.0), (-4.0, -3.0), (-5.0,  0.0),
@@ -153,7 +153,7 @@ Male_Fantasy = MapPreset(
         (-6.0,  0.0), (-4.0,  0.0), (-2.5,  0.0), ( 0.0,  0.0),
         ( 2.5,  0.0), ( 4.0,  2.0), ( 6.0,  3.5), ( 8.0,  2.0),
         ( 9.5,  0.0), ( 8.0, -2.0), ( 6.0, -3.5), ( 4.0, -2.0), ( 2.5,  0.0),
-        ( 0.0,  8.0), ( 8.0,  6.0), (10.0,  0.0), (12.0,  4.0), (18.0, 10.0)
+        ( 0.0,  8.0), ( 8.0,  6.0), (10.0,  0.0), (12.0,  4.0)
     ],
     tower_slots = [
         (-6.0,  0.0), ( 6.0,  0.0), ( 0.0, -6.0), ( 0.0,  6.0),
@@ -161,8 +161,8 @@ Male_Fantasy = MapPreset(
         ( 0.0,  0.0), (-1.0, 2.5)
     ],
     path_width = 1.25,
-    ground_scale = (80.0, 1.0, 60.0),
-    camera_distance = 25.0
+    ground_scale = (30.0, 1.0, 30),
+    camera_distance = 20.0
 )
 
 Mountain_Peak = MapPreset(
