@@ -62,7 +62,7 @@ abilitycost_mega_knight = 650
 ability_fast_duration = 10.0
 ability_explosive_duration = 10.0
 ability_fast_multiplier = 5.0
-megaknight_duration = 1
+megaknight_duration = 20.0
 
 # Wind Push and Slow
 wind_ability_cost = 150
@@ -278,6 +278,8 @@ class Enemy:
         self.wind_affected = True
         self.wind_slow_end_time = game_time + slow_duration
         self.speed = self.original_speed * wind_slow_factor
+        # Add logic for enemies to step back into their paths
+        self.path_idx = max(0, self.path_idx - 1)  # Move the enemy a step back in the path if they are pushed off
 
     def update_wind_effect(self, game_time):
         if self.wind_affected and game_time >= self.wind_slow_end_time:
@@ -840,11 +842,11 @@ class MegaKnight:
             if min_dist_to_path <= G.map.path_width * 2:
                 enemy.x = new_x
                 enemy.z = new_z
-                current_dist_to_start = dist2D(enemy.x, enemy.z, path[0][0], path[0][1])
+                # current_dist_to_start = dist2D(enemy.x, enemy.z, path[0][0], path[0][1])
+                # Adjust path index so enemy stays on the path
                 for i in range(len(path) - 1):
                     point_dist = dist2D(enemy.x, enemy.z, path[i][0], path[i][1])
                     next_point_dist = dist2D(enemy.x, enemy.z, path[i+1][0], path[i+1][1])
-                    
                     if point_dist <= next_point_dist:
                         enemy.path_idx = max(0, i)
                         break
