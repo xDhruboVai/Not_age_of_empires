@@ -1,4 +1,5 @@
 import math, time, random, sys
+from math import sin, cos, radians, sqrt, atan2, pi
 
 from OpenGL.GL import (
     glBegin, glEnd, glClear, glColor3f, glLoadIdentity, glMatrixMode, glPointSize,
@@ -22,6 +23,8 @@ from OpenGL.GLUT import (
     GLUT_KEY_LEFT, GLUT_KEY_RIGHT, GLUT_KEY_UP, GLUT_KEY_DOWN
 )
 
+# Pulse frequency for enemy fluffing effect
+enemy_pulse_frequency = 6.0
 
 # Window and World Dimensions
 WIDTH = 1000
@@ -266,6 +269,7 @@ class Enemy:
         self.wind_affected = False
         self.wind_slow_end_time = 0.0
         self.original_speed = speed
+        self.phase = random.random() * 2.0 * pi
 
     def is_dead(self):
         return self.health <= 0 or not self.alive
@@ -1590,16 +1594,20 @@ def draw_tower(t, quadric):
     glPopMatrix()
 
 def draw_enemy(e, quadric):
+    time_now = time.time()
+    pulse = 0.5 + 0.05 * sin(enemy_pulse_frequency * (time_now + e.phase))
+    radius1 = .7 * pulse
+    radius2 = .5 * pulse
     glPushMatrix()
-
-    glTranslatef(e.x, e.y, e.z)
+    glTranslatef(e.x, radius1, e.z)
 
     if e.is_boss:
         glColor3f(0.6, 0.1, 0.9)
     else:
         glColor3f(0.2, 0.7, 0.9)
-    gluSphere(quadric, e.radius, sphere_slices, sphere_stacks)
-
+    gluSphere(quadric, radius1, 10, 8)
+    glTranslatef(0, radius1 + radius2 * 0.8, 0)
+    gluSphere(quadric, radius2, 10, 8)
     glPopMatrix()
 
 def draw_projectile(p, quadric):
